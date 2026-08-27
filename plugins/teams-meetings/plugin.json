@@ -1,7 +1,7 @@
 {
   "name": "teams-meetings",
   "description": "Extract full speaker-attributed transcripts from Microsoft Teams meetings — both recorded meetings (via a Stream URL) and transcription-only meetings (via guided browser navigation). Works when Stream's own Download transcript button is disabled by permissions. Requires a Playwright MCP browser and Python 3.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": {
     "name": "David Pizzi"
   },

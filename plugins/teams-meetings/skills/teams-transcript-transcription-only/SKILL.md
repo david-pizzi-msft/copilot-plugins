@@ -119,8 +119,12 @@ Do **not** use `browser_run_code_unsafe` to persist output: it cannot write file
 argument throws ENOENT). It is also unnecessary for reaching the iframe — the
 frame-piercing `target` above does that on its own.
 
-Sanity check the returned `entries`: roughly 30,000px ≈ a 50-minute meeting
-≈ ~900 entries. If `entries` is under ~50, the container was mis-detected —
+Sanity check the returned `entries`: roughly 700px of `scrollHeight` per minute,
+and about 9–10 entries per minute. The function also returns `rawRows` and
+`collapsed`; `collapsed` is the number of sub-pixel duplicate measurements
+removed and is routinely 30–40% of `rawRows`. A `collapsed` of zero on a long
+transcript means the de-duplication pass is missing and the output will contain
+adjacent repeated lines. If `entries` is under ~50, the container was mis-detected —
 retarget the element whose class contains `focusZoneWithAutoScroll-`.
 
 ### 5. Locate the raw output

@@ -93,8 +93,12 @@ For this skill the transcript is in the **top-level document**, so pass no
 `target` and change `element.ownerDocument` to `document` on the first line.
 Set `STEP = 400` for the full-height Stream player.
 
-Sanity check the returned `entries`: roughly 30,000px ≈ a 50-minute meeting
-≈ ~900 entries; a 2-hour recording is around 54,000px and ~1,000 entries. If
+Sanity check the returned `entries`: roughly 700px of `scrollHeight` per minute,
+and about 9–10 entries per minute — a 65-minute meeting lands near 48,000px and
+~615 entries. The function also returns `rawRows` and `collapsed`; `collapsed`
+is the number of sub-pixel duplicate measurements removed and is routinely 30–40%
+of `rawRows`. A `collapsed` of zero on a long transcript means the de-duplication
+pass is missing and the output will contain adjacent repeated lines. If
 `entries` is under ~50 the container was mis-detected — retarget the element
 whose class contains `focusZoneWithAutoScroll-`.
 

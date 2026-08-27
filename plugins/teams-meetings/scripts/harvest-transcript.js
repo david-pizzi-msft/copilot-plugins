@@ -30,6 +30,12 @@
  * also yields correct ordering. A Set of strings would silently drop legitimate
  * repeats such as "Okay." or "Yeah".
  *
+ * Positions are fractional CSS pixels and the browser snaps them to device
+ * pixels differently at different scroll offsets, so one node can measure y and
+ * y+1 across two steps and survive as two rows. A final pass collapses adjacent
+ * rows with identical text within 3px. Genuine repeats sit tens of pixels apart
+ * and are preserved.
+ *
  * Fluent UI class suffixes (itemHeader-350, entryText-212, ...) change between
  * Microsoft builds, so they are matched by prefix and never hard-coded.
  */
@@ -72,12 +78,19 @@ async (element) => {
   await new Promise(r => setTimeout(r, 500));
   harvest();
 
-  const rows = Array.from(map.values()).sort((a, b) => a.y - b.y);
+  // Sub-pixel snapping makes the same node measure y and y±1 at different
+  // scroll offsets, so collapse identical neighbours within a few pixels.
+  const sorted = Array.from(map.values()).sort((a, b) => a.y - b.y);
+  const rows = sorted.filter((r, i) => {
+    const prev = sorted[i - 1];
+    return !(prev && prev.type === r.type && prev.text === r.text && r.y - prev.y <= 3);
+  });
+
   const lines = rows.map(r => {
     if (r.type !== 'h') return r.text;
     const m = r.text.match(/^(.*?)\s+\d+ (?:minutes?|seconds?).*?(\d+:\d+(?::\d+)?)$/);
     return '\n[' + (m ? m[2] : '') + '] ' + (m ? m[1] : r.text) + ':';
   });
 
-  return { scrollHeight: c.scrollHeight, entries: rows.length, text: lines.join('\n') };
+  return { scrollHeight: c.scrollHeight, rawRows: sorted.length, entries: rows.length, collapsed: sorted.length - rows.length, text: lines.join('\n') };
 }
