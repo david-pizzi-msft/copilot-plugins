@@ -121,19 +121,22 @@ frame-piercing `target` above does that on its own.
 
 Check the result object rather than eyeballing the text:
 
-- `keyedBy` tells you which identity strategy was used. `"id"` means the panel
-  exposed sequential `entry-N` DOM ids and the harvest is exact; `missingIds`
-  will then be `[]` if coverage was complete, and any pair listed is a real gap
-  to re-run with a smaller `STEP`. `"position"` means the Recap panel did not
-  expose those ids and it fell back to keying on rounded vertical position.
-- The position fallback is approximate. Rounding drift can duplicate a row (see
-  the note in the harvester); adjacent identical rows within 3px are collapsed,
-  and `collapsed` reports how many. Expect 30–40% of `rawRows` on a long
-  transcript — but a plausible `collapsed` is not proof, so scan for repeated
-  adjacent lines before delivering the file.
-- `entries` counts speaker turns, roughly 6 per minute. If it is under ~50 the
-  container was mis-detected — retarget the element whose class contains
-  `focusZoneWithAutoScroll-`.
+- `keyedBy` should be `"id"`. The Recap panel exposes sequential `entry-N` and
+  `itemHeader-N` ids, same as the Stream player, so the harvest is exact.
+  `"position"` means those ids were absent and it fell back to pixel
+  measurement — that path can emit adjacent duplicate lines, so verify by hand.
+- `missingIds` must be `[]`. The ids are contiguous, so an empty array proves
+  every turn between `firstId` and `lastId` was captured. Any pair listed is a
+  real gap: re-run with a smaller `STEP`.
+- `entriesWithoutHeader` is expected to be large. Headers mark speaker changes,
+  not entries, so in a two-person call roughly a third to a half of entries
+  carry none. It is not an error.
+- `recoveredFromLabel` should be `0`. Anything higher means a header was missed
+  and the speaker was inferred from the group's aria-label, which is unreliable
+  — see the note in the harvester.
+- `entries` counts speaker turns, roughly 10 per minute on a two-person call.
+  If it is under ~50 the container was mis-detected — retarget the element whose
+  class contains `focusZoneWithAutoScroll-`.
 
 ### 5. Locate the raw output
 
@@ -185,13 +188,17 @@ Verification is **self-contained**. There is no reference copy to compare
 against — this skill runs precisely when no recording and no downloadable
 transcript exist — so rely on the result object, not on an external file.
 
-- Check `keyedBy`. If `"id"`, confirm `missingIds` is `[]`: the ids are
-  contiguous, so an empty gap list proves complete coverage.
-- If `"position"`, there is no completeness proof available. Count long lines
-  against distinct long lines — they should be equal — and scan for repeated
-  adjacent lines before delivering the file.
+- Confirm `keyedBy` was `"id"`, `missingIds` was `[]`, and `recoveredFromLabel`
+  was `0`. Together those establish complete coverage with reliable speaker
+  attribution.
+- If `keyedBy` was `"position"`, there is no completeness proof available. Count
+  long lines against distinct long lines — they should be equal — and scan for
+  repeated adjacent lines before delivering the file.
 - Confirm the last timestamp is plausible for the meeting length. If it stops
   far short, the scroll did not complete — re-run step 4 with a smaller `STEP`.
+- Check the speaker list looks right. A transcription-only call is usually a
+  small number of named people; a stray "Speaker 1" is normal for the
+  "started transcription" event but not for actual speech.
 - View the first ~14 lines to confirm the header and structure.
 - Delete `transcript-raw.md`.
 - Report a compact table: path, size, line count, entries harvested, time span,

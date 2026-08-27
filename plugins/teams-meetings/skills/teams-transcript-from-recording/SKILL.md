@@ -96,20 +96,23 @@ Set `STEP = 400` for the full-height Stream player.
 Check the result object rather than eyeballing the text:
 
 - `keyedBy` should be `"id"`. Stream tags each turn with a sequential DOM id
-  (`entry-0`, `entry-1`, ...) and an aria-label carrying the speaker and offset,
-  which is what the harvester keys on. `"position"` means those ids were absent
-  and it fell back to pixel measurement — that path can emit adjacent duplicate
-  lines, so verify the output before trusting it.
+  (`entry-0`, `entry-1`, ...) and each speaker change with a matching
+  `itemHeader-N`, which is what the harvester keys on. `"position"` means those
+  ids were absent and it fell back to pixel measurement — that path can emit
+  adjacent duplicate lines, so verify the output before trusting it.
 - `missingIds` must be `[]`. The ids are contiguous, so an empty array is proof
   that every turn between `firstId` and `lastId` was captured. Any pair listed is
   a genuine gap: re-run with a smaller `STEP`.
+- `entriesWithoutHeader` is expected to be large. Headers mark speaker changes,
+  not entries, so a speaker holding the floor for several paragraphs produces
+  one header and several bare entries. It is not an error.
+- `recoveredFromLabel` should be `0`. Anything higher means a header was missed
+  and the speaker was inferred from the group's aria-label, which is unreliable
+  — see the note in the harvester.
 - `entries` counts speaker turns, not lines — expect roughly 6 per minute
   (a 66-minute meeting yields ~400). If it is under ~50 the container was
   mis-detected: retarget the element whose class contains
   `focusZoneWithAutoScroll-`.
-- `unparsedLabels` counts turns whose aria-label held no speaker. Stream's
-  "started/stopped transcription" markers are the usual cause; more than two or
-  three suggests the label format changed.
 
 Do **not** use `browser_run_code_unsafe` to persist output: it cannot write files
 (`require` is undefined, dynamic `import()` is unavailable, and its `filename`
@@ -162,10 +165,10 @@ Verification is **self-contained** — it needs no reference copy of the
 transcript, which is the whole point, since this skill exists precisely for
 meetings where Stream will not give you one.
 
-- Confirm `keyedBy` was `"id"` and `missingIds` was `[]`. That pair is the
-  guarantee: the ids are contiguous, so an empty gap list proves every turn
-  between `firstId` and `lastId` was captured. Nothing external is required to
-  establish completeness.
+- Confirm `keyedBy` was `"id"`, `missingIds` was `[]`, and `recoveredFromLabel`
+  was `0`. That trio is the guarantee: the ids are contiguous, so an empty gap
+  list proves complete coverage, and a zero recovery count means every speaker
+  came from a header rather than a guess. Nothing external is required.
 - Confirm the last timestamp is plausible for the meeting length. If it stops
   far short, the scroll did not complete — re-run step 4 with a smaller `STEP`.
 - Count long lines against distinct long lines; they should be equal. On the id
