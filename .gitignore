@@ -1,0 +1,12 @@
+# Harvested transcripts and their intermediates — never commit meeting content.
+transcript-raw.md
+transcript-raw.json
+*-transcript.txt
+
+# Python
+__pycache__/
+*.py[cod]
+
+# OS
+.DS_Store
+Thumbs.db

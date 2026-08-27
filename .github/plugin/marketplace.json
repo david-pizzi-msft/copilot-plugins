@@ -1,0 +1,18 @@
+{
+  "name": "david-pizzi-plugins",
+  "owner": {
+    "name": "David Pizzi"
+  },
+  "metadata": {
+    "description": "Plugins for GitHub Copilot CLI and Microsoft Scout, focused on Microsoft 365 workflows.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "teams-meetings",
+      "description": "Extract speaker-attributed transcripts from Microsoft Teams meetings, whether the meeting was recorded or transcription-only. Requires a Playwright MCP browser.",
+      "version": "1.0.0",
+      "source": "./plugins/teams-meetings"
+    }
+  ]
+}
