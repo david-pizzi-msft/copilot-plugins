@@ -93,14 +93,23 @@ For this skill the transcript is in the **top-level document**, so pass no
 `target` and change `element.ownerDocument` to `document` on the first line.
 Set `STEP = 400` for the full-height Stream player.
 
-Sanity check the returned `entries`: roughly 700px of `scrollHeight` per minute,
-and about 9–10 entries per minute — a 65-minute meeting lands near 48,000px and
-~615 entries. The function also returns `rawRows` and `collapsed`; `collapsed`
-is the number of sub-pixel duplicate measurements removed and is routinely 30–40%
-of `rawRows`. A `collapsed` of zero on a long transcript means the de-duplication
-pass is missing and the output will contain adjacent repeated lines. If
-`entries` is under ~50 the container was mis-detected — retarget the element
-whose class contains `focusZoneWithAutoScroll-`.
+Check the result object rather than eyeballing the text:
+
+- `keyedBy` should be `"id"`. Stream tags each turn with a sequential DOM id
+  (`entry-0`, `entry-1`, ...) and an aria-label carrying the speaker and offset,
+  which is what the harvester keys on. `"position"` means those ids were absent
+  and it fell back to pixel measurement — that path can emit adjacent duplicate
+  lines, so verify the output before trusting it.
+- `missingIds` must be `[]`. The ids are contiguous, so an empty array is proof
+  that every turn between `firstId` and `lastId` was captured. Any pair listed is
+  a genuine gap: re-run with a smaller `STEP`.
+- `entries` counts speaker turns, not lines — expect roughly 6 per minute
+  (a 66-minute meeting yields ~400). If it is under ~50 the container was
+  mis-detected: retarget the element whose class contains
+  `focusZoneWithAutoScroll-`.
+- `unparsedLabels` counts turns whose aria-label held no speaker. Stream's
+  "started/stopped transcription" markers are the usual cause; more than two or
+  three suggests the label format changed.
 
 Do **not** use `browser_run_code_unsafe` to persist output: it cannot write files
 (`require` is undefined, dynamic `import()` is unavailable, and its `filename`
@@ -150,16 +159,39 @@ rather than today's. Strip characters invalid in Windows filenames.
 ### 9. Verify, tidy, report
 
 - View the first ~14 lines to confirm the header and structure.
-- Check the last timestamp is plausible for the meeting length. If it stops far
-  short, the scroll did not complete — re-run step 4 with a smaller `STEP`.
+- Confirm `missingIds` was `[]` and the last timestamp is plausible for the
+  meeting length. If it stops far short, the scroll did not complete — re-run
+  step 4 with a smaller `STEP`.
+- Check for adjacent duplicate lines. A quick count of long lines against
+  distinct long lines will surface them; they should be equal.
 - Delete `transcript-raw.md`.
 - Report a compact table: path, size, line count, entries harvested, time span,
   and speakers detected.
+
+### 10. Optional: cross-check against a .vtt
+
+If the user can supply the meeting's `.vtt` (Stream's own download, when
+permissions allow), it makes an excellent ground truth. Compare as a **multiset
+of normalised words** — lowercase, strip punctuation — rather than line by line:
+
+- Every VTT word should appear in the transcript. Anything missing is real loss.
+- A handful of extra words is expected: the file header, plus Stream's
+  "started/stopped transcription" markers, which the VTT does not contain.
+
+Do **not** treat a sequential diff as authoritative. The VTT interleaves cues
+strictly by start time, whereas the panel groups each speaker's contiguous
+speech into one turn. Where people talk over one another the two orderings
+diverge legitimately, and a naive diff reports that as both a deletion and an
+insertion despite no content being lost.
 
 ## Caveats to pass on to the user
 
 - Transcripts are AI-generated and mangle proper nouns and names frequently.
   Say so, and cite an example from the file if you spot one.
+- Overlapping speech is reordered. The panel groups each speaker's contiguous
+  speech into a single turn, so a short interjection can appear after the
+  sentence it interrupted rather than inside it. No words are lost, but the
+  order is not strictly chronological where people talk over one another.
 - Meeting content may be confidential. Writing it to local disk at the user's
   request is fine — never forward or upload it anywhere without explicit
   confirmation.

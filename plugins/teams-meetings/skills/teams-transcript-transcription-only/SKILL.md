@@ -119,13 +119,21 @@ Do **not** use `browser_run_code_unsafe` to persist output: it cannot write file
 argument throws ENOENT). It is also unnecessary for reaching the iframe — the
 frame-piercing `target` above does that on its own.
 
-Sanity check the returned `entries`: roughly 700px of `scrollHeight` per minute,
-and about 9–10 entries per minute. The function also returns `rawRows` and
-`collapsed`; `collapsed` is the number of sub-pixel duplicate measurements
-removed and is routinely 30–40% of `rawRows`. A `collapsed` of zero on a long
-transcript means the de-duplication pass is missing and the output will contain
-adjacent repeated lines. If `entries` is under ~50, the container was mis-detected —
-retarget the element whose class contains `focusZoneWithAutoScroll-`.
+Check the result object rather than eyeballing the text:
+
+- `keyedBy` tells you which identity strategy was used. `"id"` means the panel
+  exposed sequential `entry-N` DOM ids and the harvest is exact; `missingIds`
+  will then be `[]` if coverage was complete, and any pair listed is a real gap
+  to re-run with a smaller `STEP`. `"position"` means the Recap panel did not
+  expose those ids and it fell back to keying on rounded vertical position.
+- The position fallback is approximate. Rounding drift can duplicate a row (see
+  the note in the harvester); adjacent identical rows within 3px are collapsed,
+  and `collapsed` reports how many. Expect 30–40% of `rawRows` on a long
+  transcript — but a plausible `collapsed` is not proof, so scan for repeated
+  adjacent lines before delivering the file.
+- `entries` counts speaker turns, roughly 6 per minute. If it is under ~50 the
+  container was mis-detected — retarget the element whose class contains
+  `focusZoneWithAutoScroll-`.
 
 ### 5. Locate the raw output
 
