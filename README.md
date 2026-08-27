@@ -27,8 +27,15 @@ Or install a single plugin directly, without the marketplace:
 copilot plugin install david-pizzi-msft/copilot-plugins:plugins/teams-meetings
 ```
 
-In **Microsoft Scout**, use **Customize → Plugins** to add the marketplace and
-install from it.
+In **Microsoft Scout**, install with the same `copilot plugin` commands above.
+Scout reads the Copilot CLI plugin store, so plugin skills become available to
+it after a restart. Note that Scout may set `COPILOT_HOME` to its own directory
+inside its shell sessions — if a plugin installs successfully but never appears,
+check that it landed in `~/.copilot/installed-plugins` and not somewhere else:
+
+```powershell
+$env:COPILOT_HOME = "$env:USERPROFILE\.copilot"   # then install as above
+```
 
 ## Requirements
 
