@@ -181,18 +181,31 @@ rather than today's. Strip characters invalid in Windows filenames.
 
 ### 9. Verify, tidy, report
 
+Verification is **self-contained**. There is no reference copy to compare
+against — this skill runs precisely when no recording and no downloadable
+transcript exist — so rely on the result object, not on an external file.
+
+- Check `keyedBy`. If `"id"`, confirm `missingIds` is `[]`: the ids are
+  contiguous, so an empty gap list proves complete coverage.
+- If `"position"`, there is no completeness proof available. Count long lines
+  against distinct long lines — they should be equal — and scan for repeated
+  adjacent lines before delivering the file.
+- Confirm the last timestamp is plausible for the meeting length. If it stops
+  far short, the scroll did not complete — re-run step 4 with a smaller `STEP`.
 - View the first ~14 lines to confirm the header and structure.
-- Check the last timestamp is plausible for the meeting length. If it stops far
-  short, the scroll did not complete — re-run step 4 with a smaller `STEP`.
 - Delete `transcript-raw.md`.
 - Report a compact table: path, size, line count, entries harvested, time span,
-  and speakers detected.
+  and speakers detected. State which path was used when it was `"position"`.
 
 ## Caveats to pass on to the user
 
 - Transcripts are AI-generated and mangle proper nouns and names frequently —
   including attendees' own names in their greetings. Say so, and cite an example
   from the file if you spot one.
+- Overlapping speech is reordered. The panel groups each speaker's contiguous
+  speech into a single turn, so a short interjection can appear after the
+  sentence it interrupted rather than inside it. No words are lost, but the
+  order is not strictly chronological where people talk over one another.
 - Meeting content may be confidential. Writing it to local disk at the user's
   request is fine — never forward or upload it anywhere without explicit
   confirmation.

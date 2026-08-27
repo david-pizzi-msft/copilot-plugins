@@ -158,21 +158,32 @@ rather than today's. Strip characters invalid in Windows filenames.
 
 ### 9. Verify, tidy, report
 
+Verification is **self-contained** — it needs no reference copy of the
+transcript, which is the whole point, since this skill exists precisely for
+meetings where Stream will not give you one.
+
+- Confirm `keyedBy` was `"id"` and `missingIds` was `[]`. That pair is the
+  guarantee: the ids are contiguous, so an empty gap list proves every turn
+  between `firstId` and `lastId` was captured. Nothing external is required to
+  establish completeness.
+- Confirm the last timestamp is plausible for the meeting length. If it stops
+  far short, the scroll did not complete — re-run step 4 with a smaller `STEP`.
+- Count long lines against distinct long lines; they should be equal. On the id
+  path they always are, so any inequality means the fallback ran.
 - View the first ~14 lines to confirm the header and structure.
-- Confirm `missingIds` was `[]` and the last timestamp is plausible for the
-  meeting length. If it stops far short, the scroll did not complete — re-run
-  step 4 with a smaller `STEP`.
-- Check for adjacent duplicate lines. A quick count of long lines against
-  distinct long lines will surface them; they should be equal.
 - Delete `transcript-raw.md`.
 - Report a compact table: path, size, line count, entries harvested, time span,
   and speakers detected.
 
-### 10. Optional: cross-check against a .vtt
+### 10. If a .vtt happens to be available
 
-If the user can supply the meeting's `.vtt` (Stream's own download, when
-permissions allow), it makes an excellent ground truth. Compare as a **multiset
-of normalised words** — lowercase, strip punctuation — rather than line by line:
+Normally it will not be — a viewer who could download the transcript would not
+need this skill. Treat a `.vtt` as a rare debugging aid, never a prerequisite:
+do not ask the user for one, do not block on its absence, and do not present the
+transcript as unverified without it. Step 9 is sufficient.
+
+If the user volunteers one, compare as a **multiset of normalised words** —
+lowercase, strip punctuation — rather than line by line:
 
 - Every VTT word should appear in the transcript. Anything missing is real loss.
 - A handful of extra words is expected: the file header, plus Stream's
