@@ -232,8 +232,7 @@ function setStatus(jobId, run) {
   const text = run.status === "waiting"
     ? (run.note || "Waiting for you in the browser")
     : run.status === "running" ? "Working…"
-    : run.status === "queued" ? "Starting…" : run.status;
-  el.style.display = "";
+    : run.status === "queued" ? "Starting…" : run.status;  el.style.display = "";
   el.className = "status " + run.status;
   el.querySelector(".txt").textContent = text;
   card.classList.add("active");
@@ -261,6 +260,8 @@ function renderCards() {
     : guided ? "Working…"
     : busy ? "Another run in progress" : "Start guided capture";
   gBtn.dataset.mode = waiting ? "go" : "start";
+  // Cancel is the only way out of a stall, so keep it available whenever the
+  // guided run is live — including while it is merely waiting.
   $("cancelGuided").style.display = guided ? "" : "none";
   setStatus("transcription-only", guided);
 }

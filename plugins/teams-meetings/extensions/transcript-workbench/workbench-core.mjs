@@ -309,21 +309,33 @@ export async function listTranscripts(dir) {
     }
 }
 
+/**
+ * Snapshot the output folder as name -> modified time.
+ *
+ * Names alone are not enough. Re-extracting the same meeting overwrites the same
+ * file, so a name-only diff sees nothing new and reads a successful re-run as a
+ * failure. The mtime distinguishes "already there" from "just written".
+ */
 export async function snapshotOutputs(dir) {
+    const out = new Map();
     try {
-        return new Set((await readdir(dir)).filter((n) => n.toLowerCase().endsWith(TRANSCRIPT_SUFFIX)));
-    } catch {
-        return new Set();
-    }
+        for (const name of await readdir(dir)) {
+            if (!name.toLowerCase().endsWith(TRANSCRIPT_SUFFIX)) continue;
+            try { out.set(name, (await stat(join(dir, name))).mtimeMs); } catch { /* vanished */ }
+        }
+    } catch { /* folder not there yet */ }
+    return out;
 }
 
+/** Transcripts written or rewritten since the snapshot. */
 export async function newOutputsSince(dir, before) {
-    try {
-        return (await readdir(dir))
-            .filter((n) => n.toLowerCase().endsWith(TRANSCRIPT_SUFFIX) && !before.has(n));
-    } catch {
-        return [];
+    const now = await snapshotOutputs(dir);
+    const changed = [];
+    for (const [name, mtime] of now) {
+        const was = before.get(name);
+        if (was === undefined || mtime > was) changed.push(name);
     }
+    return changed;
 }
 
 export async function previewTranscript(dir, name, maxLines = 200) {

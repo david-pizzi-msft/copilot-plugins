@@ -13,6 +13,7 @@ import {
     startServer, ensureStateFile, loadState, mutate,
     opSetInputs, opQueueRun, opStartRun, opWaitRun, opFinishRun, opClearRuns, activeRun,
     buildPrompt, goPrompt, jobById, listTranscripts, parseHeader, parseSpeakers, safeJoin, fileUrl, openPath,
+    snapshotOutputs, newOutputsSince,
 } from "../workbench-core.mjs";
 
 let failures = 0;
@@ -119,6 +120,23 @@ try {
     check("finds one transcript", items.length === 1, String(items.length));
     check("ignores other files", !items.some((i) => i.name === "notes.txt"));
     check("describes it", items[0]?.title === "Weekly Sync" && items[0]?.duration === "53:28");
+
+    console.log("output detection");
+    // Re-extracting a meeting overwrites the same filename, so a name-only diff
+    // reads a successful re-run as a failure. This is the case that broke.
+    const snap = await snapshotOutputs(dir);
+    check("snapshot carries mtimes", snap.get("Weekly-Sync-20260825-transcript.txt") > 0);
+    check("nothing new yet", (await newOutputsSince(dir, snap)).length === 0);
+
+    await new Promise((r) => setTimeout(r, 15));
+    await writeFile(join(dir, "Weekly-Sync-20260825-transcript.txt"), SAMPLE + "\nmore\n", "utf-8");
+    const rewritten = await newOutputsSince(dir, snap);
+    check("overwrite counts as output", rewritten.length === 1, JSON.stringify(rewritten));
+
+    await writeFile(join(dir, "Other-20260825-transcript.txt"), SAMPLE, "utf-8");
+    const both = await newOutputsSince(dir, snap);
+    check("new file counts too", both.length === 2, JSON.stringify(both));
+    await rm(join(dir, "Other-20260825-transcript.txt"));
 
     console.log("http");
     let dispatched = null, resumed = null;

@@ -280,37 +280,56 @@ session.on("assistant.message", (event) => {
     if (typeof content === "string" && content.trim()) lastAssistantMessage = content.trim();
 });
 
-// A turn finishing is the completion signal: diff the output folder to find what
-// the run produced, then close the run out.
+/** Close a run out as soon as its transcript actually lands. */
+async function settleIfProduced(runId, meta) {
+    const entry = instances.get(meta.instanceId);
+    if (!entry) { inFlight.delete(runId); return false; }
+
+    const outputs = await newOutputsSince(meta.outputFolder, meta.before);
+    if (!outputs.length) return false;
+
+    inFlight.delete(runId);
+    await mutate(entry.stateFile, (d) =>
+        opFinishRun(d, runId, { status: "complete", summary: lastAssistantMessage, outputs }));
+    return true;
+}
+
+/**
+ * The file, not the turn, is the completion signal.
+ *
+ * Judging a run when the session went idle was wrong twice over. The guided
+ * capture idles while waiting for the reader, and even the unattended path can
+ * idle before the transcript is written — one run was marked failed at 18:16 for
+ * a file that appeared at 18:18. So poll the output folder and let a run finish
+ * whenever its transcript actually turns up, however many turns that takes.
+ */
+setInterval(() => {
+    for (const [runId, meta] of [...inFlight]) {
+        settleIfProduced(runId, meta).catch(() => {});
+    }
+}, 2000);
+
+/**
+ * Idle no longer decides anything — it parks a run as waiting so the panel can
+ * offer Go. A genuinely stuck run therefore stays visible as waiting until the
+ * reader cancels it, which is the honest outcome: from here a pause and a stall
+ * look identical, and claiming failure while a run is still working is worse
+ * than admitting we do not know.
+ */
 session.on("session.idle", async () => {
     for (const [runId, meta] of [...inFlight]) {
         const entry = instances.get(meta.instanceId);
         if (!entry) { inFlight.delete(runId); continue; }
 
+        if (await settleIfProduced(runId, meta).catch(() => false)) continue;
+
         const doc = await loadState(entry.stateFile);
         const run = doc.runs.find((r) => r.id === runId);
         if (!run || (run.status !== "running" && run.status !== "waiting")) { inFlight.delete(runId); continue; }
 
-        const outputs = await newOutputsSince(meta.outputFolder, meta.before);
-
-        // A guided capture that has produced nothing yet is almost certainly
-        // paused for the reader, not broken. Park it and show the Go button
-        // rather than calling a run failed while it is still going.
-        if (!outputs.length && meta.canPause) {
-            meta.canPause = false;
-            await mutate(entry.stateFile, (d) =>
-                opWaitRun(d, runId, "Sign in and open Recap → Transcript, then press Go"));
-            continue;
-        }
-
-        inFlight.delete(runId);
-        await mutate(entry.stateFile, (d) =>
-            opFinishRun(d, runId, {
-                status: outputs.length ? "complete" : "failed",
-                error: outputs.length ? "" : "No transcript file was produced",
-                summary: lastAssistantMessage,
-                outputs,
-            }));
+        await mutate(entry.stateFile, (d) => opWaitRun(d, runId, meta.canPause
+            ? "Sign in and open Recap → Transcript, then press Go"
+            : "Paused — press Go to continue, or Cancel to stop"));
     }
 });
 
