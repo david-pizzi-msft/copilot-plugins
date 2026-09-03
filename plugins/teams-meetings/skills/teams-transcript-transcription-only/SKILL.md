@@ -172,15 +172,20 @@ python <PLUGIN>/scripts/clean-transcript.py "<RAW JSON PATH>" `
   --source "Microsoft Teams Recap"
 ```
 
-The script prints a JSON summary — path, size, line count, entries, first and
-last timestamp, and detected speakers. Use that for your report rather than
-re-reading the transcript.
+The script prints a JSON summary — path, folder, `file://` URLs, size, line
+count, entries, first and last timestamp, and detected speakers. Use that for
+your report rather than re-reading the transcript.
 
 ### 8. Filename and location
 
 Save to the working directory as
 `<Short-Meeting-Name>-<YYYYMMDD>-transcript.txt`, using the **meeting** date
 rather than today's. Strip characters invalid in Windows filenames.
+
+Pass `--out` as a **bare filename**, not a path, so the file lands in the
+working directory the user is already looking at. The summary reports the
+resolved absolute location, which is what you then surface in step 9 — never
+assume the reader knows where the working directory is.
 
 ### 9. Verify, tidy, report
 
@@ -201,8 +206,23 @@ transcript exist — so rely on the result object, not on an external file.
   "started transcription" event but not for actual speech.
 - View the first ~14 lines to confirm the header and structure.
 - Delete `transcript-raw.md`.
-- Report a compact table: path, size, line count, entries harvested, time span,
-  and speakers detected. State which path was used when it was `"position"`.
+- **Lead the report with a clickable link to the file.** The saved location is
+  not obvious to the reader, so do not bury it in a table cell. Open with a
+  markdown link built from the summary's `url`, then give the folder from
+  `folder_url`:
+
+  ```markdown
+  Saved to **[Standup-20260825-transcript.txt](file:///C:/Users/you/Standup-20260825-transcript.txt)**
+  in [C:\Users\you](file:///C:/Users/you)
+  ```
+
+  Take both URIs verbatim from the summary — they are already percent-encoded,
+  so paths containing spaces (`OneDrive - Microsoft`) link correctly. Never
+  hand-build a `file://` URL from the plain `path`; unencoded spaces silently
+  break the link.
+- Then report a compact table: path, size, line count, entries harvested, time
+  span, and speakers detected. State which path was used when it was
+  `"position"`.
 
 ## Caveats to pass on to the user
 

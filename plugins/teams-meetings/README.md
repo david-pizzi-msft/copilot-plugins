@@ -96,6 +96,11 @@ python scripts/clean-transcript.py transcript-raw.md `
   --title "Standup" --date "25 August 2026" --source "Microsoft Teams Recap"
 ```
 
+It prints a JSON summary to stdout, including the resolved absolute `path`, the
+containing `folder`, and `url` / `folder_url` as percent-encoded `file://` URIs.
+The skills use those to end the run with a clickable link, so you are never left
+hunting for where the transcript was saved.
+
 ## Known limitations
 
 - **Transcripts are AI-generated.** Proper nouns and names are frequently

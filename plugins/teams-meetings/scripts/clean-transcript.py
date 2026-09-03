@@ -11,7 +11,10 @@ Usage:
         [--owner "Jane Doe"] [--source "Microsoft Teams Recap"]
 
 Prints a short JSON summary to stdout so the calling agent can report and
-verify without reading the whole transcript back into its context.
+verify without reading the whole transcript back into its context. The summary
+carries both the absolute ``path`` and a ``url``/``folder_url`` pair as
+``file://`` URIs, so the agent can surface a clickable link rather than leaving
+the reader to hunt for where the file landed.
 
 Two artefacts in the raw text are corrected here:
 
@@ -27,6 +30,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import pathlib
 import re
 import sys
 from datetime import date
@@ -99,7 +103,9 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    with open(args.raw, encoding="utf-8") as handle:
+    # utf-8-sig tolerates a BOM, which some editors and shells prepend when the
+    # raw file is round-tripped by hand; plain utf-8 would reject it outright.
+    with open(args.raw, encoding="utf-8-sig") as handle:
         payload = json.load(handle)
 
     if "text" not in payload:
@@ -118,10 +124,16 @@ def main() -> int:
     with open(args.out, "w", encoding="utf-8") as handle:
         handle.write(build_header(args, duration) + text)
 
+    out_path = os.path.abspath(args.out)
+    folder = os.path.dirname(out_path)
+
     print(
         json.dumps(
             {
-                "path": os.path.abspath(args.out),
+                "path": out_path,
+                "folder": folder,
+                "url": pathlib.Path(out_path).as_uri(),
+                "folder_url": pathlib.Path(folder).as_uri(),
                 "bytes": os.path.getsize(args.out),
                 "lines": len(text.split("\n")),
                 "entries_harvested": payload.get("entries"),
