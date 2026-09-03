@@ -25,19 +25,36 @@ waste turns rediscovering them:
 
 Instead, both skills harvest the rendered DOM of the transcript panel, which
 works with view-only rights. The panel is virtualised — only ~50 entries exist
-in the DOM at once — so the harvest scrolls in small steps and de-duplicates by
-vertical document position, which also preserves ordering.
+in the DOM at once — so the harvest scrolls in small steps. Both surfaces tag
+each turn with a sequential DOM id (`entry-0`, `entry-1`, …) and each speaker
+change with a matching `itemHeader-N`, so entries are keyed on that integer
+rather than measured by pixel position. Because the ids are contiguous, the
+harvest can prove its own coverage: an empty `missingIds` means every turn was
+captured, with no reference copy needed.
 
 ## Requirements
 
 - **A Playwright MCP browser.** `.mcp.json` declares `@playwright/mcp`, so
-  Copilot CLI acquires the browser tools on install. Microsoft Scout already
-  provides an equivalent surface.
+  Copilot CLI and the GitHub Copilot app acquire the browser tools on install.
+  Microsoft Scout already provides an equivalent surface.
+- **The Chromium binary.** `npx @playwright/mcp` supplies the *server*, not the
+  browser itself. On a machine that has never run Playwright, the first harvest
+  fails until you run:
+
+  ```powershell
+  npx playwright install chromium
+  ```
+
+  Roughly 150 MB, once per machine. Scout users can skip this — its bundled
+  browser is already provisioned.
 - **Python 3** on `PATH`, for `scripts/clean-transcript.py`.
 - **A headed browser** for `teams-transcript-transcription-only` — you have to
-  see it in order to drive it.
+  see it in order to drive it. `@playwright/mcp` runs headed by default; do not
+  pass `--headless` for that skill.
 - You must be signed in to Microsoft 365 in that browser, and have at least
-  view access to the meeting.
+  view access to the meeting. The MCP server keeps a persistent profile, so the
+  sign-in survives between sessions — but it is a *separate* profile from your
+  everyday Edge or Chrome, so the first run always needs a fresh sign-in.
 - Shell examples are **PowerShell / Windows**.
 
 ## Output
@@ -82,6 +99,10 @@ python scripts/clean-transcript.py transcript-raw.md `
 
 - **Transcripts are AI-generated.** Proper nouns and names are frequently
   mangled — including attendees' own names.
+- **Overlapping speech is reordered.** Each speaker's contiguous speech is
+  grouped into one turn, so a short interjection can land after the sentence it
+  interrupted. No words are lost, but the order is not strictly chronological
+  where people talk over one another.
 - **Fluent UI class names change between Microsoft builds.** The harvest matches
   class *prefixes* (`itemHeader-`, `entryText-`, `eventText-`) and auto-detects
   the scroll container rather than hard-coding selectors, but a sufficiently
