@@ -37,24 +37,25 @@ captured, with no reference copy needed.
 - **A Playwright MCP browser.** `.mcp.json` declares `@playwright/mcp`, so
   Copilot CLI and the GitHub Copilot app acquire the browser tools on install.
   Microsoft Scout already provides an equivalent surface.
-- **The Chromium binary.** `npx @playwright/mcp` supplies the *server*, not the
-  browser itself. On a machine that has never run Playwright, the first harvest
-  fails until you run:
+- **Microsoft Edge.** `.mcp.json` pins `--browser msedge`, so the harvest drives
+  the Edge already present on every Windows machine. Nothing to download and no
+  admin rights needed.
 
-  ```powershell
-  npx playwright install chromium
-  ```
-
-  Roughly 150 MB, once per machine. Scout users can skip this — its bundled
-  browser is already provisioned.
+  Do not remove that flag. Playwright MCP otherwise defaults to Google Chrome,
+  which is absent by default on Microsoft-managed machines and typically needs
+  admin approval to install — the plugin fails to launch at all without it.
+  `npx playwright install chromium` is *not* a workaround: it resolves a
+  Playwright core version independent of the one `@playwright/mcp` bundles, so
+  you get, say, build 1234 while the server demands 1243, and the mismatch
+  returns after the next MCP release.
 - **Python 3** on `PATH`, for `scripts/clean-transcript.py`.
 - **A headed browser** for `teams-transcript-transcription-only` — you have to
   see it in order to drive it. `@playwright/mcp` runs headed by default; do not
   pass `--headless` for that skill.
 - You must be signed in to Microsoft 365 in that browser, and have at least
   view access to the meeting. The MCP server keeps a persistent profile, so the
-  sign-in survives between sessions — but it is a *separate* profile from your
-  everyday Edge or Chrome, so the first run always needs a fresh sign-in.
+  sign-in survives between sessions — but it is a *separate* Edge profile from
+  your everyday one, so the first run always needs a fresh sign-in.
 - Shell examples are **PowerShell / Windows**.
 
 ## Output
