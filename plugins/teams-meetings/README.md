@@ -3,15 +3,38 @@
 Extract full speaker-attributed transcripts from Microsoft Teams meetings and
 save them as clean `.txt` files.
 
-Works in two situations, with a skill for each:
+Works in two situations, with a skill for each, plus a canvas that drives both:
 
 | Skill | Use when |
 |---|---|
 | `teams-transcript-from-recording` | The meeting was **recorded** and you have a Microsoft Stream / SharePoint URL (`…/_layouts/15/stream.aspx?id=…`). Runs unattended. |
 | `teams-transcript-transcription-only` | The meeting was **transcribed but not recorded**, so no shareable URL exists. Opens a browser, you navigate to Recap → Transcript and say "go", the agent harvests. |
+| `transcript-workbench` | You would rather click than type. Opens a dashboard in the GitHub Copilot app. |
 
-Each skill points at the other, so the agent can hand off if it picks wrong —
-for instance when a recording exists but its link turns out to be unusable.
+Each extraction skill points at the other, so the agent can hand off if it picks
+wrong — for instance when a recording exists but its link turns out to be unusable.
+
+## The Transcript Workbench canvas
+
+In the **GitHub Copilot app**, say *"open the transcript workbench"* for a panel with:
+
+- a card for each extraction mode, so their different behaviour is visible rather
+  than hidden behind one button;
+- a box to paste the recording link;
+- a **folder picker** for where transcripts are saved, remembered between runs;
+- every transcript produced, with its meeting title, date, length and speakers —
+  and **Open** and **Reveal in Explorer** buttons.
+
+That last part is the reason it exists. The skills previously saved into the
+agent's working directory, which in the app is a per-chat scratch folder under
+`~/.copilot/chats/<date>/<slug>` — correct, but effectively undiscoverable, and
+discarded along with the chat. Reporting a `file://` link did not reliably help,
+because such links do not render as clickable in every surface. Making the
+destination an explicit input, and going through the OS to open it, fixes the
+cause instead of the symptom.
+
+The canvas renders only in the GitHub Copilot app. Copilot CLI and Microsoft
+Scout can run the skills perfectly well, but cannot draw the UI.
 
 ## Why it isn't just a download
 
@@ -81,11 +104,26 @@ Hi, Ada.
 
 ```text
 plugin.json                              manifest
-.mcp.json                                Playwright MCP server
+.mcp.json                                Playwright MCP server, pinned to Edge
 skills/teams-transcript-from-recording/
 skills/teams-transcript-transcription-only/
+skills/transcript-workbench/             opens the canvas
+extensions/transcript-workbench/         the canvas itself
+  extension.mjs                          canvas lifecycle, dispatches runs
+  workbench-core.mjs                     state, folder browser, HTTP, file open
+  assets/workbench.html                  the UI
+  scripts/smoke-test.mjs                 exercises the server without the app
 scripts/harvest-transcript.js            DOM harvest, passed to browser_evaluate
 scripts/clean-transcript.py              raw JSON → headed .txt, prints a JSON summary
+```
+
+The canvas has no test harness beyond `smoke-test.mjs`, which starts the server,
+exercises every route and checks the HTML asset — run it with plain Node, no app
+required:
+
+```powershell
+cd extensions/transcript-workbench
+node scripts/smoke-test.mjs
 ```
 
 `clean-transcript.py` is a normal CLI and can be run by hand:

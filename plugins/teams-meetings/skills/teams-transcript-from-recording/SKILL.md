@@ -155,14 +155,19 @@ your report rather than re-reading the transcript.
 
 ### 8. Filename and location
 
-Save to the working directory as
-`<Short-Recording-Name>-<YYYYMMDD>-transcript.txt`, using the **recording** date
-rather than today's. Strip characters invalid in Windows filenames.
+Name the file `<Short-Recording-Name>-<YYYYMMDD>-transcript.txt`, using the
+**recording** date rather than today's. Strip characters invalid in Windows
+filenames.
 
-Pass `--out` as a **bare filename**, not a path, so the file lands in the
-working directory the user is already looking at. The summary reports the
-resolved absolute location, which is what you then surface in step 9 — never
-assume the reader knows where the working directory is.
+**Where to save it.** If the caller named a folder — the Transcript Workbench
+canvas always does — pass `--out` as an absolute path inside that folder. Only
+fall back to a bare filename in the working directory when no folder was given.
+
+That default is a poor one in the GitHub Copilot app, where the working
+directory is a per-chat scratch folder under `~/.copilot/chats/<date>/<slug>`:
+correct, but effectively undiscoverable, and discarded with the chat. If no
+folder was named and the `transcript-workbench` canvas is available, call its
+`get_output_folder` action and save there instead.
 
 ### 9. Verify, tidy, report
 
@@ -180,20 +185,17 @@ meetings where Stream will not give you one.
   path they always are, so any inequality means the fallback ran.
 - View the first ~14 lines to confirm the header and structure.
 - Delete `transcript-raw.md`.
-- **Lead the report with a clickable link to the file.** The saved location is
-  not obvious to the reader, so do not bury it in a table cell. Open with a
-  markdown link built from the summary's `url`, then give the folder from
-  `folder_url`:
+- **Lead the report with where the file is.** The saved location is not obvious
+  to the reader, so do not bury it in a table cell. Give the filename and its
+  full folder first.
 
-  ```markdown
-  Saved to **[Standup-20260825-transcript.txt](file:///C:/Users/you/Standup-20260825-transcript.txt)**
-  in [C:\Users\you](file:///C:/Users/you)
-  ```
-
-  Take both URIs verbatim from the summary — they are already percent-encoded,
-  so paths containing spaces (`OneDrive - Microsoft`) link correctly. Never
-  hand-build a `file://` URL from the plain `path`; unencoded spaces silently
-  break the link.
+  If the `transcript-workbench` canvas is available, offer its
+  `reveal_transcript` action — opening Explorer with the file selected answers
+  "where is it?" far better than any link. A markdown `file://` link does not
+  render as clickable in every surface, so treat it as a supplement, never the
+  only signpost. If you do include one, take the `url` from the summary
+  verbatim; it is already percent-encoded, so paths containing spaces
+  (`OneDrive - Microsoft`) survive. Never hand-build one from the plain `path`.
 - Then report a compact table: path, size, line count, entries harvested, time
   span, and speakers detected.
 

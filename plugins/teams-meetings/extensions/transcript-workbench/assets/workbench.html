@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Transcript Workbench</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --panel-2: #1c2129; --border: #30363d;
+    --text: #e6edf3; --muted: #8b949e; --accent: #2f81f7;
+    --ok: #3fb950; --warn: #d29922; --err: #f85149; --radius: 10px;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #ffffff; --panel: #f6f8fa; --panel-2: #eef1f4; --border: #d0d7de;
+      --text: #1f2328; --muted: #59636e;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 16px; background: var(--bg); color: var(--text);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  }
+  h1 { font-size: 16px; margin: 0 0 2px; }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 8px; }
+  .sub { color: var(--muted); font-size: 12px; margin: 0 0 16px; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 14px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  input[type=text] {
+    width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--text); font: inherit; font-size: 13px;
+  }
+  input[type=text]:focus { outline: none; border-color: var(--accent); }
+  .field { display: flex; gap: 6px; }
+  .field input[type=text] { flex: 1; min-width: 0; }
+  button { font: inherit; cursor: pointer; }
+  button.browse, button.ghost {
+    flex: 0 0 auto; padding: 8px 12px; font-size: 12.5px; background: var(--panel-2);
+    color: var(--text); border: 1px solid var(--border); border-radius: 6px; white-space: nowrap;
+  }
+  button.browse:hover, button.ghost:hover { border-color: var(--accent); }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; }
+  .card {
+    display: flex; flex-direction: column; gap: 6px; text-align: left; padding: 12px;
+    background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+    border-radius: var(--radius); transition: border-color .12s, transform .12s;
+  }
+  .card:hover:not(.disabled) { border-color: var(--accent); transform: translateY(-1px); }
+  .card.disabled { opacity: .55; }
+  .card .name { font-weight: 600; font-size: 13.5px; }
+  .card .blurb { color: var(--muted); font-size: 12px; }
+  .card button.run {
+    margin-top: 4px; padding: 7px 10px; font-size: 12.5px; border-radius: 6px;
+    border: 1px solid var(--accent); background: var(--accent); color: #fff;
+  }
+  .card button.run:disabled { background: var(--panel); color: var(--muted); border-color: var(--border); cursor: not-allowed; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th { text-align: left; color: var(--muted); font-weight: 500; padding: 4px 8px 6px 0; font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; }
+  td { padding: 7px 8px 7px 0; border-top: 1px solid var(--border); vertical-align: top; }
+  td.actions { text-align: right; white-space: nowrap; }
+  td.actions button { margin-left: 4px; padding: 4px 9px; font-size: 12px; border-radius: 5px; background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+  td.actions button:hover { border-color: var(--accent); }
+  .title { font-weight: 600; }
+  .meta { color: var(--muted); font-size: 11.5px; }
+  .empty { color: var(--muted); font-size: 12.5px; padding: 10px 0; }
+  .pill { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 11px; border: 1px solid var(--border); }
+  .pill.running { color: var(--warn); border-color: var(--warn); }
+  .pill.complete { color: var(--ok); border-color: var(--ok); }
+  .pill.failed { color: var(--err); border-color: var(--err); }
+  .pill.queued { color: var(--muted); }
+  .banner { display: none; margin-bottom: 12px; padding: 8px 11px; border-radius: 6px; font-size: 12.5px; border: 1px solid var(--err); color: var(--err); }
+  .banner.show { display: block; }
+  .head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+  /* folder picker */
+  .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55); align-items: center; justify-content: center; padding: 24px; }
+  .modal.show { display: flex; }
+  .dialog { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); width: min(560px, 100%); max-height: 80vh; display: flex; flex-direction: column; }
+  .dialog header { padding: 12px 14px; border-bottom: 1px solid var(--border); }
+  .dialog .cur { font-size: 12px; color: var(--muted); word-break: break-all; }
+  .dialog .list { overflow: auto; padding: 6px 0; flex: 1; }
+  .dialog .list button { display: block; width: 100%; text-align: left; padding: 7px 14px; background: none; border: 0; color: var(--text); font-size: 13px; }
+  .dialog .list button:hover { background: var(--panel-2); }
+  .dialog footer { padding: 10px 14px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; gap: 8px; }
+  .drives { display: flex; gap: 6px; flex-wrap: wrap; padding: 8px 14px 0; }
+  .drives button { padding: 3px 9px; font-size: 12px; border-radius: 5px; background: var(--panel-2); border: 1px solid var(--border); color: var(--text); }
+  .primary { background: var(--accent); border: 1px solid var(--accent); color: #fff; padding: 7px 14px; border-radius: 6px; font-size: 12.5px; }
+</style>
+</head>
+<body>
+
+<h1>Transcript Workbench</h1>
+<p class="sub">Pull a Microsoft Teams meeting transcript and keep it somewhere you can find again.</p>
+
+<div class="banner" id="banner"></div>
+
+<div class="panel">
+  <h2>Inputs</h2>
+  <div style="margin-bottom:10px">
+    <label for="url">Recording link <span style="opacity:.7">— only for “From a recording”</span></label>
+    <input type="text" id="url" spellcheck="false" placeholder="https://….sharepoint.com/…/stream.aspx?id=…" />
+  </div>
+  <div>
+    <label for="folder">Save transcripts to</label>
+    <div class="field">
+      <input type="text" id="folder" spellcheck="false" />
+      <button class="browse" id="browse">Browse…</button>
+      <button class="browse" id="openFolder">Open</button>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Extract</h2>
+  <div class="cards" id="cards"></div>
+</div>
+
+<div class="panel">
+  <div class="head">
+    <h2 style="margin:0">Transcripts</h2>
+    <button class="ghost" id="refresh">Refresh</button>
+  </div>
+  <div id="transcripts"></div>
+</div>
+
+<div class="panel" id="runsPanel" style="display:none">
+  <div class="head">
+    <h2 style="margin:0">Runs</h2>
+    <button class="ghost" id="clear">Clear finished</button>
+  </div>
+  <div id="runs"></div>
+</div>
+
+<div class="modal" id="picker">
+  <div class="dialog">
+    <header>
+      <div style="font-weight:600;margin-bottom:2px">Choose a folder</div>
+      <div class="cur" id="pickerPath"></div>
+    </header>
+    <div class="drives" id="pickerDrives"></div>
+    <div class="list" id="pickerList"></div>
+    <footer>
+      <button class="ghost" id="pickerCancel">Cancel</button>
+      <button class="primary" id="pickerChoose">Use this folder</button>
+    </footer>
+  </div>
+</div>
+
+<script>
+const TOKEN = "__WORKBENCH_TOKEN__";
+const $ = (id) => document.getElementById(id);
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, {
+    ...opts,
+    headers: { "x-workbench-token": TOKEN, ...(opts.body ? { "Content-Type": "application/json" } : {}) },
+  });
+  return await res.json().catch(() => ({ ok: false, error: "bad_response" }));
+}
+
+function warn(msg) {
+  const b = $("banner");
+  if (!msg) { b.classList.remove("show"); return; }
+  b.textContent = msg;
+  b.classList.add("show");
+  clearTimeout(warn._t);
+  warn._t = setTimeout(() => b.classList.remove("show"), 6000);
+}
+
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => (
+  { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+const kb = (n) => n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(0) + " KB" : (n / 1048576).toFixed(1) + " MB";
+
+function when(iso) {
+  if (!iso) return "";
+  const d = new Date(iso), now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  return sameDay
+    ? "today " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    : d.toLocaleDateString([], { day: "numeric", month: "short" }) + " " +
+      d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+let STATE = null, JOBS = [], BUSY = false;
+
+function renderCards() {
+  const busy = BUSY;
+  $("cards").innerHTML = JOBS.map((j) => `
+    <div class="card ${busy ? "disabled" : ""}">
+      <div class="name">${esc(j.name)}</div>
+      <div class="blurb">${esc(j.blurb)}</div>
+      <button class="run" data-job="${esc(j.id)}" ${busy ? "disabled" : ""}>
+        ${busy ? "Run in progress…" : (j.needsUrl ? "Extract from link" : "Start guided capture")}
+      </button>
+    </div>`).join("");
+  for (const b of $("cards").querySelectorAll("button.run")) {
+    b.onclick = async () => {
+      const r = await api("/api/run", { method: "POST", body: JSON.stringify({ jobId: b.dataset.job }) });
+      if (r.error) warn(r.error); else { warn(""); await load(); }
+    };
+  }
+}
+
+function renderTranscripts(items) {
+  if (!items.length) {
+    $("transcripts").innerHTML = `<div class="empty">Nothing here yet. Run an extraction above and the file will appear, with buttons to open it.</div>`;
+    return;
+  }
+  $("transcripts").innerHTML = `<table><thead><tr>
+      <th>Meeting</th><th>Recorded</th><th>Length</th><th></th></tr></thead><tbody>` +
+    items.map((t) => `<tr>
+      <td>
+        <div class="title">${esc(t.title || t.name)}</div>
+        <div class="meta">${esc(t.name)} · ${kb(t.bytes)} · saved ${esc(when(t.modified))}${
+          t.speakers && t.speakers.length ? " · " + t.speakers.length + " speaker" + (t.speakers.length > 1 ? "s" : "") : ""}</div>
+      </td>
+      <td class="meta">${esc(t.date || "")}</td>
+      <td class="meta">${esc(t.duration || "")}</td>
+      <td class="actions">
+        <button data-open="${esc(t.name)}">Open</button>
+        <button data-reveal="${esc(t.name)}">Reveal</button>
+      </td></tr>`).join("") + `</tbody></table>`;
+
+  for (const b of $("transcripts").querySelectorAll("[data-open]")) {
+    b.onclick = async () => {
+      const r = await api("/api/open", { method: "POST", body: JSON.stringify({ name: b.dataset.open }) });
+      if (!r.ok) warn("Could not open that file: " + (r.error || "unknown"));
+    };
+  }
+  for (const b of $("transcripts").querySelectorAll("[data-reveal]")) {
+    b.onclick = async () => {
+      const r = await api("/api/open", { method: "POST", body: JSON.stringify({ name: b.dataset.reveal, reveal: true }) });
+      if (!r.ok) warn("Could not reveal that file: " + (r.error || "unknown"));
+    };
+  }
+}
+
+function renderRuns(runs) {
+  $("runsPanel").style.display = runs.length ? "" : "none";
+  if (!runs.length) return;
+  $("runs").innerHTML = `<table><tbody>` + runs.map((r) => {
+    const dur = r.startedAt && r.finishedAt
+      ? Math.max(1, Math.round((new Date(r.finishedAt) - new Date(r.startedAt)) / 1000)) + "s" : "";
+    return `<tr>
+      <td><div class="title">${esc(r.jobName)}</div>
+          <div class="meta">${esc(when(r.queuedAt))}${dur ? " · " + dur : ""}${
+            r.error ? " · " + esc(r.error) : ""}</div></td>
+      <td class="actions"><span class="pill ${esc(r.status)}">${esc(r.status)}</span></td>
+    </tr>`;
+  }).join("") + `</tbody></table>`;
+}
+
+async function load() {
+  const data = await api("/api/state");
+  if (!data.ok) { warn(data.error || "Could not read state"); return; }
+  STATE = data.state; JOBS = data.jobs;
+  BUSY = data.state.runs.some((r) => r.status === "queued" || r.status === "running");
+  if (document.activeElement !== $("url")) $("url").value = STATE.inputs.url || "";
+  if (document.activeElement !== $("folder")) $("folder").value = STATE.inputs.outputFolder || "";
+  renderCards();
+  renderTranscripts(data.transcripts || []);
+  renderRuns(STATE.runs || []);
+}
+
+const saveInputs = (body) => api("/api/inputs", { method: "POST", body: JSON.stringify(body) });
+let t;
+const debounce = (fn) => { clearTimeout(t); t = setTimeout(fn, 350); };
+
+$("url").oninput = () => debounce(() => saveInputs({ url: $("url").value }));
+$("folder").oninput = () => debounce(() => saveInputs({ outputFolder: $("folder").value }).then(load));
+$("refresh").onclick = load;
+$("openFolder").onclick = async () => {
+  const r = await api("/api/open", { method: "POST", body: JSON.stringify({}) });
+  if (!r.ok) warn("Could not open that folder: " + (r.error || "unknown"));
+};
+$("clear").onclick = async () => { await api("/api/clear", { method: "POST" }); await load(); };
+
+// --- folder picker ---
+let pickerPath = null;
+async function openPicker(start) {
+  const r = await api("/api/browse?path=" + encodeURIComponent(start || ""));
+  if (!r.ok) { warn("Cannot read that folder"); return; }
+  pickerPath = r.path;
+  $("pickerPath").textContent = r.path;
+  $("pickerDrives").innerHTML = (r.drives || []).map((d) => `<button data-go="${esc(d)}">${esc(d)}</button>`).join("") +
+    `<button data-go="${esc(r.home)}">Home</button>`;
+  const up = r.parent ? `<button data-go="${esc(r.parent)}">↑ ..</button>` : "";
+  $("pickerList").innerHTML = up + (r.entries.length
+    ? r.entries.map((e) => `<button data-go="${esc(r.path.replace(/[\\/]+$/, "") + "\\" + e.name)}">📁 ${esc(e.name)}</button>`).join("")
+    : `<div class="empty" style="padding:10px 14px">No sub-folders here.</div>`);
+  for (const b of document.querySelectorAll("#pickerList [data-go], #pickerDrives [data-go]")) {
+    b.onclick = () => openPicker(b.dataset.go);
+  }
+  $("picker").classList.add("show");
+}
+$("browse").onclick = () => openPicker($("folder").value || "");
+$("pickerCancel").onclick = () => $("picker").classList.remove("show");
+$("pickerChoose").onclick = async () => {
+  $("picker").classList.remove("show");
+  if (!pickerPath) return;
+  $("folder").value = pickerPath;
+  await saveInputs({ outputFolder: pickerPath });
+  await load();
+};
+$("picker").onclick = (e) => { if (e.target === $("picker")) $("picker").classList.remove("show"); };
+
+load();
+// Poll while a run is in flight so the cards re-enable and the file appears
+// without the reader having to click Refresh.
+setInterval(() => { if (BUSY) load(); }, 2500);
+</script>
+</body>
+</html>
