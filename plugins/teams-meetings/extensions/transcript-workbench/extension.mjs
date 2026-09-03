@@ -13,8 +13,8 @@ import { join } from "node:path";
 import {
     JOBS, jobById, defaultOutputFolder, ensureFolder,
     startServer, ensureStateFile, loadState, mutate,
-    opSetInputs, opQueueRun, opStartRun, opFinishRun, opClearRuns,
-    buildPrompt, snapshotOutputs, newOutputsSince,
+    opSetInputs, opQueueRun, opStartRun, opWaitRun, opFinishRun, opClearRuns,
+    buildPrompt, goPrompt, snapshotOutputs, newOutputsSince,
     listTranscripts, previewTranscript, openPath, fileUrl,
 } from "./workbench-core.mjs";
 
@@ -65,6 +65,10 @@ async function dispatchRun(instanceId, runId) {
         instanceId,
         before: await snapshotOutputs(run.outputFolder),
         outputFolder: run.outputFolder,
+        // The guided capture stops mid-way to have the reader sign in and
+        // navigate. That pause looks exactly like the turn ending, so the first
+        // idle must park the run rather than judge it.
+        canPause: !job.needsUrl,
     });
 
     await mutate(entry.stateFile, (d) => opStartRun(d, runId));
@@ -75,6 +79,27 @@ async function dispatchRun(instanceId, runId) {
         inFlight.delete(runId);
         await mutate(entry.stateFile, (d) =>
             opFinishRun(d, runId, { status: "failed", error: err?.message || String(err) }));
+    }
+}
+
+/**
+ * The Go button: resume a run that is waiting on the reader, without them having
+ * to type into the conversation. Sending a prompt starts a new turn, so the run
+ * goes back to running and the idle handler will judge it on the next stop.
+ */
+async function resumeRun(instanceId, runId) {
+    const entry = instances.get(instanceId);
+    if (!entry) return { ok: false, error: "Workbench is not open" };
+
+    const meta = inFlight.get(runId);
+    if (meta) meta.canPause = false;   // one pause only; the next idle is the verdict
+
+    await mutate(entry.stateFile, (d) => opStartRun(d, runId));
+    try {
+        await session.send({ prompt: goPrompt() });
+        return { ok: true };
+    } catch (err) {
+        return { ok: false, error: err?.message || String(err) };
     }
 }
 
@@ -200,6 +225,18 @@ session = await joinSession({
                     },
                 },
                 {
+                    name: "resume_run",
+                    description: "Press Go: resume a run that is paused waiting for the user in the browser, once they have signed in and reached Recap → Transcript. Equivalent to the Go button in the panel.",
+                    handler: async (ctx) => {
+                        const entry = ctxOf(ctx);
+                        if (!entry) return { error: "Workbench is not open" };
+                        const doc = await loadState(entry.stateFile);
+                        const run = doc.runs.find((r) => r.status === "waiting" || r.status === "running");
+                        if (!run) return { ok: false, error: "Nothing is waiting" };
+                        return await resumeRun(ctx.instanceId, run.id);
+                    },
+                },
+                {
                     name: "clear_run_history",
                     description: "Remove finished runs from the history, keeping anything still in flight.",
                     handler: (ctx) => act(ctx, (doc) => opClearRuns(doc)),
@@ -213,6 +250,7 @@ session = await joinSession({
                     const started = await startServer({
                         stateFile,
                         dispatch: (runId) => dispatchRun(ctx.instanceId, runId),
+                        resume: (runId) => resumeRun(ctx.instanceId, runId),
                     });
                     entry = { ...started, stateFile };
                     instances.set(ctx.instanceId, entry);
@@ -251,14 +289,23 @@ session.on("session.idle", async () => {
 
         const doc = await loadState(entry.stateFile);
         const run = doc.runs.find((r) => r.id === runId);
-        if (!run || run.status !== "running") { inFlight.delete(runId); continue; }
+        if (!run || (run.status !== "running" && run.status !== "waiting")) { inFlight.delete(runId); continue; }
+
+        const outputs = await newOutputsSince(meta.outputFolder, meta.before);
+
+        // A guided capture that has produced nothing yet is almost certainly
+        // paused for the reader, not broken. Park it and show the Go button
+        // rather than calling a run failed while it is still going.
+        if (!outputs.length && meta.canPause) {
+            meta.canPause = false;
+            await mutate(entry.stateFile, (d) =>
+                opWaitRun(d, runId, "Sign in and open Recap → Transcript, then press Go"));
+            continue;
+        }
 
         inFlight.delete(runId);
-        const outputs = await newOutputsSince(meta.outputFolder, meta.before);
         await mutate(entry.stateFile, (d) =>
             opFinishRun(d, runId, {
-                // No new transcript means the skill bailed — a sign-in wall, a
-                // dead link, or a meeting with no transcript at all.
                 status: outputs.length ? "complete" : "failed",
                 error: outputs.length ? "" : "No transcript file was produced",
                 summary: lastAssistantMessage,

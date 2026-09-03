@@ -11,8 +11,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
     startServer, ensureStateFile, loadState, mutate,
-    opSetInputs, opQueueRun, opStartRun, opFinishRun, opClearRuns,
-    buildPrompt, jobById, listTranscripts, parseHeader, parseSpeakers, safeJoin, fileUrl, openPath,
+    opSetInputs, opQueueRun, opStartRun, opWaitRun, opFinishRun, opClearRuns, activeRun,
+    buildPrompt, goPrompt, jobById, listTranscripts, parseHeader, parseSpeakers, safeJoin, fileUrl, openPath,
 } from "../workbench-core.mjs";
 
 let failures = 0;
@@ -84,9 +84,22 @@ try {
     doc = await loadState(stateFile);
     const runId = doc.runs[0].id;
     await mutate(stateFile, (d) => opStartRun(d, runId));
+
+    // A guided run that pauses for the user must not read as finished.
+    await mutate(stateFile, (d) => opWaitRun(d, runId, "Sign in, then press Go"));
+    doc = await loadState(stateFile);
+    check("waiting status set", doc.runs[0].status === "waiting" && doc.runs[0].note === "Sign in, then press Go");
+    check("waiting counts as active", !!activeRun(doc));
+    const whileWaiting = await mutate(stateFile, (d) => opQueueRun(d, "from-recording"));
+    check("waiting blocks a new run", !!whileWaiting.error, whileWaiting.error);
+    await mutate(stateFile, (d) => opClearRuns(d));
+    doc = await loadState(stateFile);
+    check("clear keeps a waiting run", doc.runs.length === 1);
+
     await mutate(stateFile, (d) => opFinishRun(d, runId, { status: "complete", outputs: ["x-transcript.txt"] }));
     doc = await loadState(stateFile);
     check("run completed", doc.runs[0].status === "complete" && !!doc.runs[0].finishedAt);
+    check("note cleared on finish", !doc.runs[0].note);
 
     console.log("prompt");
     const prompt = buildPrompt(jobById("from-recording"), { url: "https://example.com/x", outputFolder: dir });
@@ -95,6 +108,9 @@ try {
     check("pins the folder", prompt.includes(dir));
     const guided = buildPrompt(jobById("transcription-only"), { url: "", outputFolder: dir });
     check("guided omits url line", !guided.includes("Recording URL"));
+    check("guided points at the Go button", /press \*\*Go\*\*/.test(guided));
+    check("guided says not to wait for typing", guided.includes("do not wait for me to type"));
+    check("go prompt is a resume", goPrompt().toLowerCase().startsWith("go"));
 
     console.log("listing");
     await writeFile(join(dir, "Weekly-Sync-20260825-transcript.txt"), SAMPLE, "utf-8");
@@ -105,8 +121,12 @@ try {
     check("describes it", items[0]?.title === "Weekly Sync" && items[0]?.duration === "53:28");
 
     console.log("http");
-    let dispatched = null;
-    const { server, token, url } = await startServer({ stateFile, dispatch: async (id) => { dispatched = id; } });
+    let dispatched = null, resumed = null;
+    const { server, token, url } = await startServer({
+        stateFile,
+        dispatch: async (id) => { dispatched = id; },
+        resume: async (id) => { resumed = id; return { ok: true }; },
+    });
     const base = url.replace(/\/$/, "");
     const call = (p, opts = {}) => fetch(base + p, {
         ...opts,
@@ -132,6 +152,29 @@ try {
     await new Promise((r) => setTimeout(r, 50));
     check("dispatch fired", dispatched !== null);
 
+    // The Go button: only valid while something is actually in flight. The stub
+    // dispatcher above does not start the run, so do it here — opWaitRun rightly
+    // refuses to park a run that has not begun.
+    doc = await loadState(stateFile);
+    await mutate(stateFile, (d) => opStartRun(d, doc.runs[0].id));
+    const notWaitingYet = await mutate(stateFile, (d) => opWaitRun(d, "no-such-run", "x"));
+    check("wait ignores unknown run", !notWaitingYet.error);
+    await mutate(stateFile, (d) => opWaitRun(d, doc.runs[0].id, "waiting"));
+    doc = await loadState(stateFile);
+    check("run is waiting", doc.runs[0].status === "waiting", doc.runs[0].status);
+
+    const goRes = await (await call("/api/go", { method: "POST" })).json();
+    check("go route resumes", goRes.ok !== false, JSON.stringify(goRes));
+    check("resume fired", resumed !== null);
+
+    const cancelRes = await (await call("/api/cancel", { method: "POST" })).json();
+    check("cancel route", !cancelRes.error, cancelRes.error);
+    doc = await loadState(stateFile);
+    check("cancel marks failed", doc.runs[0].status === "failed" && doc.runs[0].error === "Cancelled");
+
+    const goIdle = await (await call("/api/go", { method: "POST" })).json();
+    check("go with nothing waiting", !goIdle.ok && goIdle.error === "nothing_waiting", JSON.stringify(goIdle));
+
     const preview = await (await call("/api/preview?name=Weekly-Sync-20260825-transcript.txt")).json();
     check("preview route", preview.ok && preview.text.includes("Hello, Dave"));
 
@@ -145,7 +188,11 @@ try {
 
     console.log("assets");
     const asset = await readFile(new URL("../assets/workbench.html", import.meta.url), "utf-8");
-    check("html has cards region", asset.includes('id="cards"'));
+    check("card per job", asset.includes('id="card-from-recording"') && asset.includes('id="card-transcription-only"'));
+    check("url input inside its card", asset.indexOf('id="url"') > asset.indexOf('id="card-from-recording"')
+        && asset.indexOf('id="url"') < asset.indexOf('id="card-transcription-only"'));
+    check("go button wired", asset.includes('/api/go'));
+    check("cancel wired", asset.includes('/api/cancel'));
     check("html has folder picker", asset.includes('id="picker"'));
     check("html has token placeholder", asset.includes("__WORKBENCH_TOKEN__"));
 } finally {

@@ -61,6 +61,12 @@ Then tell the user, in one short message:
 Then **end your turn and wait**. Do not poll the tab list, do not guess, do not
 proceed until the user replies.
 
+**If you were launched from the Transcript Workbench canvas** — the prompt says
+so — point them at the panel's **Go** button instead of asking them to type, and
+say you will wait. Pressing it resumes you in the same conversation, so the whole
+job stays on one surface. Either signal means the same thing; carry on at step 2
+when it arrives.
+
 ### 2. Discover where they landed
 
 On "go", list the tabs, then search the page for `/transcript|recording|recap/i`.

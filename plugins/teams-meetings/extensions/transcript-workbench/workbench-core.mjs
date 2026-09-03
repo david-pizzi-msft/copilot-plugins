@@ -130,7 +130,7 @@ export function opSetInputs(doc, { url, outputFolder }) {
 }
 
 export function activeRun(doc) {
-    return doc.runs.find((r) => r.status === "queued" || r.status === "running") || null;
+    return doc.runs.find((r) => r.status === "queued" || r.status === "running" || r.status === "waiting") || null;
 }
 
 export function opQueueRun(doc, jobId) {
@@ -154,6 +154,7 @@ export function opQueueRun(doc, jobId) {
         queuedAt: new Date().toISOString(),
         startedAt: null,
         finishedAt: null,
+        note: "",
         summary: "",
         error: "",
         outputs: [],
@@ -167,11 +168,29 @@ export function opStartRun(doc, runId) {
     return doc;
 }
 
+/**
+ * Mark a run as waiting on the user.
+ *
+ * The guided capture pauses to have the reader sign in and navigate to
+ * Recap → Transcript. From the session's point of view that pause is
+ * indistinguishable from the turn ending, so a run must not be judged on the
+ * first idle — it is waiting, not finished.
+ */
+export function opWaitRun(doc, runId, note) {
+    const run = doc.runs.find((r) => r.id === runId);
+    if (run && (run.status === "running" || run.status === "waiting")) {
+        run.status = "waiting";
+        run.note = note || "Waiting for you in the browser";
+    }
+    return doc;
+}
+
 export function opFinishRun(doc, runId, { status, summary, error, outputs }) {
     const run = doc.runs.find((r) => r.id === runId);
     if (!run) return doc;
     run.status = status || "complete";
     run.finishedAt = new Date().toISOString();
+    run.note = "";
     if (summary) run.summary = summary;
     if (error) run.error = error;
     if (Array.isArray(outputs)) run.outputs = outputs;
@@ -179,7 +198,7 @@ export function opFinishRun(doc, runId, { status, summary, error, outputs }) {
 }
 
 export function opClearRuns(doc) {
-    doc.runs = doc.runs.filter((r) => r.status === "queued" || r.status === "running");
+    doc.runs = doc.runs.filter((r) => r.status === "queued" || r.status === "running" || r.status === "waiting");
     return doc;
 }
 
@@ -200,9 +219,25 @@ export function buildPrompt(job, { url, outputFolder }) {
         `Save the transcript into this folder: ${outputFolder}`,
         `Pass --out as an absolute path inside that folder — do not save to the working directory.`,
         "",
-        "When you are done, state the full path of the file you wrote.",
     );
+    if (!job.needsUrl) {
+        // The guided capture pauses for the reader to sign in and navigate. Point
+        // them at the panel's Go button rather than asking them to type, so the
+        // whole job stays in one surface.
+        lines.push(
+            "When the browser is open and you need me to sign in and navigate,",
+            "say so and stop. I will press **Go** in the Transcript Workbench panel",
+            "when the Recap → Transcript tab is showing — do not wait for me to type.",
+            "",
+        );
+    }
+    lines.push("When you are done, state the full path of the file you wrote.");
     return lines.join("\n");
+}
+
+/** What the Go button sends back into the session to resume a waiting run. */
+export function goPrompt() {
+    return "go — the Recap → Transcript tab is open, please harvest it now.";
 }
 
 // --- transcripts on disk -----------------------------------------------------
@@ -417,7 +452,7 @@ async function readBody(req) {
     try { return JSON.parse(Buffer.concat(chunks).toString("utf-8")); } catch { return {}; }
 }
 
-export async function startServer({ stateFile, dispatch }) {
+export async function startServer({ stateFile, dispatch, resume }) {
     const token = randomUUID();
     let html;
     try {
@@ -479,6 +514,35 @@ export async function startServer({ stateFile, dispatch }) {
                     if (queued) dispatch(queued.id).catch(() => {});
                 }
                 res.writeHead(result.error ? 400 : 200, JSON_HEADERS);
+                res.end(JSON.stringify(result));
+                return;
+            }
+
+            if (req.method === "POST" && url.pathname === "/api/go") {
+                const doc = await loadState(stateFile);
+                const run = doc.runs.find((r) => r.status === "waiting" || r.status === "running");
+                if (!run) {
+                    res.writeHead(400, JSON_HEADERS);
+                    res.end(JSON.stringify({ ok: false, error: "nothing_waiting" }));
+                    return;
+                }
+                const sent = await resume(run.id);
+                res.writeHead(sent?.ok === false ? 400 : 200, JSON_HEADERS);
+                res.end(JSON.stringify(sent || { ok: true }));
+                return;
+            }
+
+            if (req.method === "POST" && url.pathname === "/api/cancel") {
+                const doc = await loadState(stateFile);
+                const run = doc.runs.find((r) => r.status === "waiting" || r.status === "running" || r.status === "queued");
+                if (!run) {
+                    res.writeHead(400, JSON_HEADERS);
+                    res.end(JSON.stringify({ ok: false, error: "nothing_running" }));
+                    return;
+                }
+                const result = await mutate(stateFile, (d) =>
+                    opFinishRun(d, run.id, { status: "failed", error: "Cancelled" }));
+                res.writeHead(200, JSON_HEADERS);
                 res.end(JSON.stringify(result));
                 return;
             }

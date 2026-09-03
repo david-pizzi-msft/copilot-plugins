@@ -16,12 +16,15 @@ wrong — for instance when a recording exists but its link turns out to be unus
 
 ## The Transcript Workbench canvas
 
-In the **GitHub Copilot app**, say *"open the transcript workbench"* for a panel with:
+In the **GitHub Copilot app**, say *"open the transcript workbench"* for a panel
+with a card per extraction mode, each self-contained:
 
-- a card for each extraction mode, so their different behaviour is visible rather
-  than hidden behind one button;
-- a box to paste the recording link;
-- a **folder picker** for where transcripts are saved, remembered between runs;
+- **From a recording** — its own link box and Extract button. Unattended.
+- **Transcription only** — the three steps spelled out, and a **Go** button. The
+  guided capture has to pause while you sign in and reach Recap → Transcript;
+  pressing Go resumes the agent without typing into the conversation, so the run
+  stays in one place. A paused run shows as *waiting*, not failed.
+- a shared **folder picker** for where transcripts are saved, remembered between runs;
 - every transcript produced, with its meeting title, date, length and speakers —
   and **Open** and **Reveal in Explorer** buttons.
 

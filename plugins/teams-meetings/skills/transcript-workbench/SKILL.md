@@ -43,6 +43,7 @@ These are callable from chat as well as from the buttons, so the conversation an
 | `set_inputs` | Set the recording link and/or the output folder |
 | `extract_from_recording` | Run the unattended extraction against the current link |
 | `extract_transcription_only` | Run the guided capture for a meeting that was never recorded |
+| `resume_run` | Press Go: resume a run paused waiting for you in the browser |
 | `open_transcript` | Open one in its default application |
 | `reveal_transcript` | Show one in Explorer with the file selected |
 | `preview_transcript` | First 200 lines, for summarising without loading the whole file |
