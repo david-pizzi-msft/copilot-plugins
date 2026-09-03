@@ -313,11 +313,26 @@ export function safeJoin(dir, name) {
     return full;
 }
 
-function run(cmd, args) {
+/**
+ * Run a launcher and decide whether it actually failed.
+ *
+ * `ignoreExitCode` exists for explorer.exe, which returns a non-zero exit code
+ * even when it succeeds — a long-standing Windows quirk, not an error. Node
+ * distinguishes the two cases for us: when the process ran and exited non-zero
+ * `err.code` is a number, whereas a genuine spawn failure gives a string such as
+ * "ENOENT". Only the latter is worth reporting.
+ */
+function run(cmd, args, { ignoreExitCode = false } = {}) {
     return new Promise((res) => {
-        execFile(cmd, args, { windowsHide: true }, (err) => res(err ? { ok: false, error: err.message } : { ok: true }));
+        execFile(cmd, args, { windowsHide: true }, (err) => {
+            if (!err) return res({ ok: true });
+            if (ignoreExitCode && typeof err.code === "number") return res({ ok: true });
+            res({ ok: false, error: err.message });
+        });
     });
 }
+
+const explorer = (args) => run("explorer.exe", args, { ignoreExitCode: true });
 
 /**
  * Open a transcript in its default application, or reveal it in the file manager
@@ -331,8 +346,8 @@ export async function openPath(dir, name, { reveal = false } = {}) {
 
     const isFile = Boolean(name);
     if (process.platform === "win32") {
-        if (!isFile) return run("explorer.exe", [full]);
-        return reveal ? run("explorer.exe", [`/select,${full}`]) : run("cmd.exe", ["/c", "start", "", full]);
+        if (!isFile) return explorer([full]);
+        return reveal ? explorer([`/select,${full}`]) : run("cmd.exe", ["/c", "start", "", full]);
     }
     if (process.platform === "darwin") {
         return reveal && isFile ? run("open", ["-R", full]) : run("open", [full]);

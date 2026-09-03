@@ -113,6 +113,7 @@ extensions/transcript-workbench/         the canvas itself
   workbench-core.mjs                     state, folder browser, HTTP, file open
   assets/workbench.html                  the UI
   scripts/smoke-test.mjs                 exercises the server without the app
+  scripts/open-probe.mjs                 manual: checks Open and Reveal launch
 scripts/harvest-transcript.js            DOM harvest, passed to browser_evaluate
 scripts/clean-transcript.py              raw JSON → headed .txt, prints a JSON summary
 ```
@@ -125,6 +126,10 @@ required:
 cd extensions/transcript-workbench
 node scripts/smoke-test.mjs
 ```
+
+`scripts/open-probe.mjs` covers the one thing that cannot be automated: it opens
+two real Explorer windows to confirm Open and Reveal report success. Run it by
+hand and close the windows afterwards.
 
 `clean-transcript.py` is a normal CLI and can be run by hand:
 

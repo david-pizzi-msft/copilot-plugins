@@ -12,7 +12,7 @@ import { join } from "node:path";
 import {
     startServer, ensureStateFile, loadState, mutate,
     opSetInputs, opQueueRun, opStartRun, opFinishRun, opClearRuns,
-    buildPrompt, jobById, listTranscripts, parseHeader, parseSpeakers, safeJoin, fileUrl,
+    buildPrompt, jobById, listTranscripts, parseHeader, parseSpeakers, safeJoin, fileUrl, openPath,
 } from "../workbench-core.mjs";
 
 let failures = 0;
@@ -53,6 +53,13 @@ try {
     check("rejects absolute", safeJoin(dir, "C:\\Windows\\win.ini") === null);
     check("accepts plain name", safeJoin(dir, "a-transcript.txt") !== null);
     check("url encodes spaces", fileUrl("C:\\a b\\c.txt").includes("a%20b"));
+
+    // The success path is not checked here because it opens real windows — see
+    // scripts/open-probe.mjs. These two cases must still be reported as errors.
+    const missing = await openPath(dir, "nope-transcript.txt", { reveal: true });
+    check("missing file reported", !missing.ok && missing.error === "not_found", JSON.stringify(missing));
+    const escaped = await openPath(dir, "..\\..\\evil.txt", {});
+    check("open blocks traversal", !escaped.ok, JSON.stringify(escaped));
 
     console.log("state and runs");
     await ensureStateFile(stateFile);
