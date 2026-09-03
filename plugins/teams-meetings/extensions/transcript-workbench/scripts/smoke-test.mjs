@@ -206,11 +206,25 @@ try {
 
     console.log("assets");
     const asset = await readFile(new URL("../assets/workbench.html", import.meta.url), "utf-8");
+
+    // The panel's script is inline, so nothing type-checks it. A stray brace
+    // silently disables every button, which is indistinguishable from a dead
+    // server — parse it here so that can never ship.
+    const inline = asset.slice(asset.indexOf("<script>") + 8, asset.lastIndexOf("</script>"));
+    let parses = true, parseErr = "";
+    try { new Function(inline); } catch (e) { parses = false; parseErr = e.message; }
+    check("panel script parses", parses, parseErr);
+
     check("card per job", asset.includes('id="card-from-recording"') && asset.includes('id="card-transcription-only"'));
     check("url input inside its card", asset.indexOf('id="url"') > asset.indexOf('id="card-from-recording"')
         && asset.indexOf('id="url"') < asset.indexOf('id="card-transcription-only"'));
     check("go button wired", asset.includes('/api/go'));
     check("cancel wired", asset.includes('/api/cancel'));
+    // Re-rendering on every poll destroyed the buttons mid-click. Both guards
+    // must stay: delegation survives a rebuild, the signature avoids one.
+    check("open/reveal delegated", /addEventListener\("click"/.test(asset) && asset.includes('closest("[data-open], [data-reveal]")'));
+    check("transcripts render guarded", asset.includes("renderTranscripts._sig"));
+    check("runs render guarded", asset.includes("renderRuns._sig"));
     check("html has folder picker", asset.includes('id="picker"'));
     check("html has token placeholder", asset.includes("__WORKBENCH_TOKEN__"));
 } finally {

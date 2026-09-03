@@ -267,6 +267,13 @@ function renderCards() {
 }
 
 function renderTranscripts(items) {
+  // Re-rendering destroys the buttons, and a click whose mousedown and mouseup
+  // straddle a rebuild never fires. The panel polls every 2.5s, so guard on a
+  // signature and only touch the DOM when something actually changed.
+  const sig = JSON.stringify(items.map((t) => [t.name, t.bytes, t.modified]));
+  if (sig === renderTranscripts._sig) return;
+  renderTranscripts._sig = sig;
+
   if (!items.length) {
     $("transcripts").innerHTML = `<div class="empty">Nothing here yet. Run an extraction above and the file will appear, with buttons to open it.</div>`;
     return;
@@ -285,22 +292,30 @@ function renderTranscripts(items) {
         <button data-open="${esc(t.name)}">Open</button>
         <button data-reveal="${esc(t.name)}">Reveal</button>
       </td></tr>`).join("") + `</tbody></table>`;
-
-  for (const b of $("transcripts").querySelectorAll("[data-open]")) {
-    b.onclick = async () => {
-      const r = await api("/api/open", { method: "POST", body: JSON.stringify({ name: b.dataset.open }) });
-      if (!r.ok) warn("Could not open that file: " + (r.error || "unknown"));
-    };
-  }
-  for (const b of $("transcripts").querySelectorAll("[data-reveal]")) {
-    b.onclick = async () => {
-      const r = await api("/api/open", { method: "POST", body: JSON.stringify({ name: b.dataset.reveal, reveal: true }) });
-      if (!r.ok) warn("Could not reveal that file: " + (r.error || "unknown"));
-    };
-  }
 }
 
+// Delegated from the container, which is never replaced. Per spec a click fires
+// on the nearest common ancestor of mousedown and mouseup, so this still works
+// even if the row underneath is rebuilt mid-click.
+$("transcripts").addEventListener("click", async (e) => {
+  const btn = e.target.closest("[data-open], [data-reveal]");
+  if (!btn) return;
+  const reveal = btn.hasAttribute("data-reveal");
+  const name = reveal ? btn.dataset.reveal : btn.dataset.open;
+  btn.disabled = true;
+  try {
+    const r = await api("/api/open", { method: "POST", body: JSON.stringify({ name, reveal }) });
+    if (!r.ok) warn(`Could not ${reveal ? "reveal" : "open"} that file: ` + (r.error || "unknown"));
+  } finally {
+    btn.disabled = false;
+  }
+});
+
 function renderRuns(runs) {
+  const sig = JSON.stringify(runs.map((r) => [r.id, r.status, r.note, r.error, r.finishedAt]));
+  if (sig === renderRuns._sig) return;
+  renderRuns._sig = sig;
+
   $("runsPanel").style.display = runs.length ? "" : "none";
   if (!runs.length) return;
   $("runs").innerHTML = `<table><tbody>` + runs.map((r) => {
