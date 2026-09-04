@@ -29,11 +29,7 @@ is a per-chat scratch folder under `~/.copilot/chats/<date>/<slug>` — correct,
 undiscoverable, and discarded with the chat. Reporting a `file://` link did not reliably help either.
 
 The workbench fixes the cause rather than the symptom: the destination is an explicit, remembered
-input, and every transcript can be read in the panel with its full path shown and copyable.
-
-Note the canvas cannot open a file or folder through the operating system — the extension host has
-no desktop session, so a button that shells out to Explorer does nothing at all, silently. Anything
-the reader needs to see, the panel shows itself.
+input, and every transcript can be read in the panel or revealed in Explorer with one click.
 
 ## What the canvas can do once open
 
@@ -48,6 +44,7 @@ These are callable from chat as well as from the buttons, so the conversation an
 | `extract_from_recording` | Run the unattended extraction against the current link |
 | `extract_transcription_only` | Run the guided capture for a meeting that was never recorded |
 | `resume_run` | Press Go: resume a run paused waiting for you in the browser |
+| `reveal_transcript` | Show one in Explorer with the file selected |
 | `preview_transcript` | First 200 lines, for summarising without loading the whole file |
 | `clear_run_history` | Drop finished runs, keep anything in flight |
 
@@ -55,9 +52,8 @@ So "set the folder to D:\Notes and extract that link" is a valid instruction onc
 
 ## Answering "where was it saved?"
 
-Call `list_transcripts` and give the absolute path plainly, so it can be copied. Do not offer to open
-it in Explorer — nothing in the canvas can do that. Point at the panel's **View** button, or its
-**Copy path**, and use `preview_transcript` if they want to discuss the contents.
+Call `list_transcripts` and give the absolute path, then offer `reveal_transcript` — Explorer opening
+with the file selected answers the question better than a path in prose does.
 
 ## If the canvas does not open
 

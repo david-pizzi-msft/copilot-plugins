@@ -152,7 +152,7 @@
   <div class="field">
     <input type="text" id="folder" spellcheck="false" />
     <button class="browse" id="browse">Browse…</button>
-    <button class="browse" id="openFolder">Copy path</button>
+    <button class="browse" id="openFolder">Open folder</button>
   </div>
 </div>
 
@@ -313,7 +313,7 @@ function renderTranscripts(items) {
       <td class="meta">${esc(t.duration || "")}</td>
       <td class="actions">
         <button data-view="${esc(t.name)}">View</button>
-        <button data-copy="${esc(t.path)}">Copy path</button>
+        <button data-reveal="${esc(t.name)}">Reveal</button>
       </td></tr>`).join("") + `</tbody></table>`;
 }
 
@@ -371,9 +371,10 @@ async function showTranscript(name) {
 $("transcripts").addEventListener("click", async (e) => {
   const view = e.target.closest("[data-view]");
   if (view) { await showTranscript(view.dataset.view); return; }
-  const copy = e.target.closest("[data-copy]");
-  if (copy) {
-    toast(await copyText(copy.dataset.copy) ? "Path copied to clipboard" : "Could not copy — select it in the viewer instead");
+  const rev = e.target.closest("[data-reveal]");
+  if (rev) {
+    const r = await api("/api/open", { method: "POST", body: JSON.stringify({ name: rev.dataset.reveal }) });
+    if (!r.ok) warn("Could not reveal that file: " + (r.error || "unknown"));
   }
 });
 
@@ -436,7 +437,8 @@ $("cancelGuided").onclick = async () => {
 };
 
 $("openFolder").onclick = async () => {
-  toast(await copyText($("folder").value) ? "Folder path copied to clipboard" : "Could not copy that path");
+  const r = await api("/api/open", { method: "POST", body: JSON.stringify({}) });
+  if (!r.ok) warn("Could not open that folder: " + (r.error || "unknown"));
 };
 $("clear").onclick = async () => { await api("/api/clear", { method: "POST" }); await load(); };
 

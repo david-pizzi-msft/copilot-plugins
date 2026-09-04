@@ -231,11 +231,13 @@ try {
     check("actions delegated", /addEventListener\("click"/.test(asset) && asset.includes('closest("[data-view]")'));
     check("transcripts render guarded", asset.includes("renderTranscripts._sig"));
     check("runs render guarded", asset.includes("renderRuns._sig"));
-    // The extension host has no desktop session, so nothing may depend on the
-    // OS opening a window — the panel has to show the file itself.
     check("viewer present", asset.includes('id="viewerBody"') && asset.includes("/api/read"));
-    check("no OS-open dependency in UI", !asset.includes("/api/open"));
-    check("copy fallback present", asset.includes("execCommand"));
+    check("reveal wired", asset.includes("/api/open") && asset.includes("data-reveal"));
+    // execFile must not pass windowsHide: it sets CREATE_NO_WINDOW, which
+    // explorer.exe inherits, so the window silently never appears.
+    const core = await readFile(new URL("../workbench-core.mjs", import.meta.url), "utf-8");
+    const launcher = core.slice(core.indexOf("function launch("), core.indexOf("export async function openPath"));
+    check("launcher omits windowsHide", !launcher.includes("windowsHide"), launcher.trim().slice(0, 120));
     check("html has folder picker", asset.includes('id="picker"'));
     check("html has token placeholder", asset.includes("__WORKBENCH_TOKEN__"));
 } finally {

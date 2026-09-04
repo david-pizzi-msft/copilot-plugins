@@ -26,13 +26,15 @@ with a card per extraction mode, each self-contained:
   stays in one place. A paused run shows as *waiting*, not failed.
 - a shared **folder picker** for where transcripts are saved, remembered between runs;
 - every transcript produced, with its meeting title, date, length and speakers,
-  a **View** button that shows it in the panel, and **Copy path**.
+  a **View** button that shows it in the panel, and **Reveal** to open Explorer
+  with the file selected. The folder's **Open folder** button does the same for
+  the destination.
 
-The canvas deliberately never asks the OS to open a file or a folder. The
-extension host has no desktop session to open a window in, so a button that
-shells out to Explorer does nothing at all — silently, which is worse than an
-error. Reading the file back over the panel's own loopback server always works,
-so that is what View does.
+Two details make the Explorer buttons work from inside the extension host, both
+taken from the vbd-content-agent panel: `execFile` must **not** be given
+`windowsHide`, since that sets `CREATE_NO_WINDOW` and explorer.exe inherits it,
+so the window silently never appears; and the callback must be treated as
+success regardless, because explorer.exe exits non-zero even when it worked.
 
 That last part is the reason it exists. The skills previously saved into the
 agent's working directory, which in the app is a per-chat scratch folder under

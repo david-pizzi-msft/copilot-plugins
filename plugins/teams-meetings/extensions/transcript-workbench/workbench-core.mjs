@@ -377,31 +377,27 @@ export function safeJoin(dir, name) {
 }
 
 /**
- * Run a launcher and decide whether it actually failed.
+ * Open a path in the OS file manager.
  *
- * `ignoreExitCode` exists for explorer.exe, which returns a non-zero exit code
- * even when it succeeds — a long-standing Windows quirk, not an error. Node
- * distinguishes the two cases for us: when the process ran and exited non-zero
- * `err.code` is a number, whereas a genuine spawn failure gives a string such as
- * "ENOENT". Only the latter is worth reporting.
+ * Two details matter, both learned from the vbd-content-agent panel, which does
+ * this successfully from the same extension host:
+ *
+ *   - No `windowsHide`. That flag sets CREATE_NO_WINDOW, and explorer.exe
+ *     inherits it, so the window it would have shown never appears — the call
+ *     "succeeds" and nothing happens.
+ *   - Always resolve true. explorer.exe exits non-zero even on success, and
+ *     inspecting the error only produces false failures.
+ *
+ * The path always comes from server-side state, never from the client, so this
+ * cannot be pointed at an arbitrary location by a page that reaches the socket.
  */
-function run(cmd, args, { ignoreExitCode = false } = {}) {
+function launch(cmd, args) {
     return new Promise((res) => {
-        execFile(cmd, args, { windowsHide: true }, (err) => {
-            if (!err) return res({ ok: true });
-            if (ignoreExitCode && typeof err.code === "number") return res({ ok: true });
-            res({ ok: false, error: err.message });
-        });
+        execFile(cmd, args, () => res({ ok: true }));
     });
 }
 
-const explorer = (args) => run("explorer.exe", args, { ignoreExitCode: true });
-
-/**
- * Open a transcript in its default application, or reveal it in the file manager
- * with the file selected. Revealing is usually what is wanted — it answers
- * "where is this?", which a link in chat does not.
- */
+/** Open a file's containing folder, or a folder itself, in the file manager. */
 export async function openPath(dir, name, { reveal = false } = {}) {
     const full = name ? safeJoin(dir, name) : resolve(dir);
     if (!full) return { ok: false, error: "path_outside_folder" };
@@ -409,13 +405,14 @@ export async function openPath(dir, name, { reveal = false } = {}) {
 
     const isFile = Boolean(name);
     if (process.platform === "win32") {
-        if (!isFile) return explorer([full]);
-        return reveal ? explorer([`/select,${full}`]) : run("cmd.exe", ["/c", "start", "", full]);
+        if (!isFile) return launch("explorer.exe", [full]);
+        return reveal ? launch("explorer.exe", [`/select,${full}`])
+                      : launch("cmd.exe", ["/c", "start", "", full]);
     }
     if (process.platform === "darwin") {
-        return reveal && isFile ? run("open", ["-R", full]) : run("open", [full]);
+        return reveal && isFile ? launch("open", ["-R", full]) : launch("open", [full]);
     }
-    return run("xdg-open", [reveal && isFile ? dirname(full) : full]);
+    return launch("xdg-open", [reveal && isFile ? dirname(full) : full]);
 }
 
 // --- folder browser ----------------------------------------------------------
@@ -599,6 +596,16 @@ export async function startServer({ stateFile, dispatch, resume }) {
                     .catch((e) => ({ error: String(e?.message || e) }));
                 res.writeHead(result.error ? 400 : 200, JSON_HEADERS);
                 res.end(JSON.stringify(result.error ? { ok: false, ...result } : { ok: true, ...result }));
+                return;
+            }
+
+            if (req.method === "POST" && url.pathname === "/api/open") {
+                const body = await readBody(req);
+                const doc = await loadState(stateFile);
+                // A file reveals with itself selected; no name means the folder.
+                const result = await openPath(doc.inputs.outputFolder, body.name, { reveal: true });
+                res.writeHead(result.ok ? 200 : 400, JSON_HEADERS);
+                res.end(JSON.stringify(result));
                 return;
             }
 
