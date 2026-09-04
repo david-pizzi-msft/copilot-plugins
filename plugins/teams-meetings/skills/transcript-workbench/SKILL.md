@@ -1,6 +1,6 @@
 ---
 name: transcript-workbench
-description: Open the Transcript Workbench canvas — a dashboard in the GitHub Copilot app for pulling Microsoft Teams meeting transcripts, with a card for each extraction mode, a box to paste a recording link, a folder picker for where the file is saved, and a viewer for every transcript produced. Use when the user asks for a UI for transcripts, says "transcript workbench", "open the workbench", wants buttons instead of prompts, asks where a transcript was saved, or wants to see or open transcripts pulled earlier.
+description: Open the Transcript Workbench canvas — a dashboard in the GitHub Copilot app for pulling Microsoft Teams meeting transcripts, with a card for each extraction mode, a box to paste a recording link, a folder picker for where the file is saved, and an Open button on every transcript produced. Use when the user asks for a UI for transcripts, says "transcript workbench", "open the workbench", wants buttons instead of prompts, asks where a transcript was saved, or wants to see or open transcripts pulled earlier.
 ---
 
 # Transcript Workbench
@@ -29,7 +29,7 @@ is a per-chat scratch folder under `~/.copilot/chats/<date>/<slug>` — correct,
 undiscoverable, and discarded with the chat. Reporting a `file://` link did not reliably help either.
 
 The workbench fixes the cause rather than the symptom: the destination is an explicit, remembered
-input, and every transcript can be read in the panel or revealed in Explorer with one click.
+input, and every transcript has an **Open** button that launches it in your default editor.
 
 ## What the canvas can do once open
 
@@ -44,7 +44,7 @@ These are callable from chat as well as from the buttons, so the conversation an
 | `extract_from_recording` | Run the unattended extraction against the current link |
 | `extract_transcription_only` | Run the guided capture for a meeting that was never recorded |
 | `resume_run` | Press Go: resume a run paused waiting for you in the browser |
-| `reveal_transcript` | Show one in Explorer with the file selected |
+| `open_transcript` | Open one in the default editor |
 | `preview_transcript` | First 200 lines, for summarising without loading the whole file |
 | `clear_run_history` | Drop finished runs, keep anything in flight |
 
@@ -52,8 +52,8 @@ So "set the folder to D:\Notes and extract that link" is a valid instruction onc
 
 ## Answering "where was it saved?"
 
-Call `list_transcripts` and give the absolute path, then offer `reveal_transcript` — Explorer opening
-with the file selected answers the question better than a path in prose does.
+Call `list_transcripts` and give the absolute path, then offer `open_transcript` — launching the file
+answers the question better than a path in prose does.
 
 ## If the canvas does not open
 

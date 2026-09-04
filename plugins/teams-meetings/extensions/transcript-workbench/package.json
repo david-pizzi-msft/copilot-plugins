@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "main": "extension.mjs",
-  "description": "A Canvas panel for the GitHub Copilot app listing every transcript this plugin has extracted, with a viewer and Reveal buttons so the saved file is never something you have to go hunting for.",
+  "description": "A Canvas panel for the GitHub Copilot app listing every transcript this plugin has extracted, with an Open button so the saved file is never something you have to go hunting for.",
   "dependencies": {
     "@github/copilot-sdk": "latest"
   },

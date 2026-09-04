@@ -2,7 +2,7 @@
 //
 // A Canvas dashboard over the two Teams transcript skills, rendered in the
 // GitHub Copilot app. Two cards — one per skill — a link to paste, a folder to
-// pick, and the transcripts that came out, each viewable or revealable.
+// pick, and the transcripts that came out, each with an Open button.
 //
 // Clicking a card injects that skill's prompt into the live Copilot session, so
 // the app is the backend and there is nothing to host. All the state, folder
@@ -119,7 +119,7 @@ session = await joinSession({
             id: "transcript-workbench",
             displayName: "Transcript Workbench",
             description:
-                "A dashboard for extracting Microsoft Teams meeting transcripts. Paste a recording link or start a transcription-only capture, choose where the file is saved with a folder picker, and see every transcript produced with buttons to open it or reveal it in Explorer. Use when the user wants a UI for pulling transcripts, asks where a transcript was saved, or wants to see or open previous transcripts.",
+                "A dashboard for extracting Microsoft Teams meeting transcripts. Paste a recording link or start a transcription-only capture, choose where the file is saved with a folder picker, and see every transcript produced with an Open button that launches it. Use when the user wants a UI for pulling transcripts, asks where a transcript was saved, or wants to see or open previous transcripts.",
             inputSchema: {
                 type: "object",
                 properties: {
@@ -185,7 +185,7 @@ session = await joinSession({
                     handler: (ctx) => queueFromAgent(ctx, "transcription-only"),
                 },
                 {
-                    name: "reveal_transcript",
+                    name: "open_transcript",
                     description: "Show a transcript in the file manager with the file selected — the direct answer to 'where is it?'. Omit the name to open the output folder itself.",
                     inputSchema: {
                         type: "object",

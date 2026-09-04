@@ -189,13 +189,13 @@ meetings where Stream will not give you one.
   to the reader, so do not bury it in a table cell. Give the filename and its
   full folder first.
 
-  If the `transcript-workbench` canvas is available, offer its
-  `reveal_transcript` action — Explorer opening with the file selected answers
-  "where is it?" better than prose does, and its **View** button shows the text
-  in the panel. A markdown `file://` link does not render as clickable in every
-  surface, so treat it as a supplement, never the only signpost. If you do
-  include one, take the `url` from the summary verbatim; it is already
-  percent-encoded, so paths containing spaces (`OneDrive - Microsoft`) survive.
+  If the `transcript-workbench` canvas is available, offer its `open_transcript`
+  action, or say the transcript is listed there with an **Open** button —
+  launching the file answers "where is it?" better than prose does. A markdown
+  `file://` link does not render as clickable in every surface, so treat it as a
+  supplement, never the only signpost. If you do include one, take the `url`
+  from the summary verbatim; it is already percent-encoded, so paths containing
+  spaces (`OneDrive - Microsoft`) survive.
 - Then report a compact table: path, size, line count, entries harvested, time
   span, and speakers detected.
 
