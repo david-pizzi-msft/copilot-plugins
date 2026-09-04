@@ -9,8 +9,7 @@
 // folder under ~/.copilot/chats/<date>/<slug>. Correct, but opaque — and thrown
 // away with the chat. Worse, a markdown file:// link to it does not reliably
 // open from the transcript. So the workbench takes the output folder as an
-// explicit input, remembers it, and offers Open and Reveal buttons that go
-// through the OS instead of a link.
+// explicit input, remembers it, and shows each transcript in the panel itself.
 
 import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
@@ -351,6 +350,23 @@ export async function previewTranscript(dir, name, maxLines = 200) {
     };
 }
 
+/**
+ * Whole transcript, for the in-panel viewer.
+ *
+ * The canvas cannot hand a file to the OS — the extension host has no desktop
+ * session to open a window in — so showing the text here is the only way the
+ * reader actually gets to see it without leaving the panel.
+ */
+export async function readTranscript(dir, name) {
+    const full = safeJoin(dir, name);
+    if (!full) return { error: "path_outside_folder" };
+    try {
+        return { name, path: full, text: await readFile(full, "utf-8") };
+    } catch (err) {
+        return { error: String(err?.message || err) };
+    }
+}
+
 /** Resolve `name` inside `dir`, refusing anything that escapes it. */
 export function safeJoin(dir, name) {
     if (typeof name !== "string" || !name || name.includes("\0")) return null;
@@ -581,6 +597,14 @@ export async function startServer({ stateFile, dispatch, resume }) {
                 const name = url.searchParams.get("name");
                 const result = await previewTranscript(doc.inputs.outputFolder, name)
                     .catch((e) => ({ error: String(e?.message || e) }));
+                res.writeHead(result.error ? 400 : 200, JSON_HEADERS);
+                res.end(JSON.stringify(result.error ? { ok: false, ...result } : { ok: true, ...result }));
+                return;
+            }
+
+            if (req.method === "GET" && url.pathname === "/api/read") {
+                const doc = await loadState(stateFile);
+                const result = await readTranscript(doc.inputs.outputFolder, url.searchParams.get("name"));
                 res.writeHead(result.error ? 400 : 200, JSON_HEADERS);
                 res.end(JSON.stringify(result.error ? { ok: false, ...result } : { ok: true, ...result }));
                 return;

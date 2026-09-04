@@ -2,7 +2,7 @@
 //
 // A Canvas dashboard over the two Teams transcript skills, rendered in the
 // GitHub Copilot app. Two cards — one per skill — a link to paste, a folder to
-// pick, and the transcripts that came out, each with Open and Reveal.
+// pick, and the transcripts that came out, each viewable in the panel.
 //
 // Clicking a card injects that skill's prompt into the live Copilot session, so
 // the app is the backend and there is nothing to host. All the state, folder
@@ -15,7 +15,7 @@ import {
     startServer, ensureStateFile, loadState, mutate,
     opSetInputs, opQueueRun, opStartRun, opWaitRun, opFinishRun, opClearRuns,
     buildPrompt, goPrompt, snapshotOutputs, newOutputsSince,
-    listTranscripts, previewTranscript, openPath, fileUrl,
+    listTranscripts, previewTranscript, fileUrl,
 } from "./workbench-core.mjs";
 
 // instanceId -> { server, url, stateFile }
@@ -183,31 +183,6 @@ session = await joinSession({
                     name: "extract_transcription_only",
                     description: "Queue and run the transcription-only extraction, which opens a browser for the user to reach Recap → Transcript. Fails if a run is already in flight.",
                     handler: (ctx) => queueFromAgent(ctx, "transcription-only"),
-                },
-                {
-                    name: "open_transcript",
-                    description: "Open one transcript in its default application. Takes the filename as listed by list_transcripts.",
-                    inputSchema: {
-                        type: "object",
-                        properties: { name: { type: "string", description: "Filename within the output folder" } },
-                        required: ["name"],
-                    },
-                    handler: async (ctx) => {
-                        const doc = await readState(ctx);
-                        return await openPath(doc?.inputs.outputFolder || defaultOutputFolder(), ctx.input?.name, { reveal: false });
-                    },
-                },
-                {
-                    name: "reveal_transcript",
-                    description: "Show a transcript in the file manager with the file selected — the direct answer to 'where is it?'. Omit the name to open the output folder itself.",
-                    inputSchema: {
-                        type: "object",
-                        properties: { name: { type: "string", description: "Filename; omit to open the folder" } },
-                    },
-                    handler: async (ctx) => {
-                        const doc = await readState(ctx);
-                        return await openPath(doc?.inputs.outputFolder || defaultOutputFolder(), ctx.input?.name, { reveal: true });
-                    },
                 },
                 {
                     name: "preview_transcript",

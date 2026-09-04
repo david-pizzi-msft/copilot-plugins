@@ -25,8 +25,14 @@ with a card per extraction mode, each self-contained:
   pressing Go resumes the agent without typing into the conversation, so the run
   stays in one place. A paused run shows as *waiting*, not failed.
 - a shared **folder picker** for where transcripts are saved, remembered between runs;
-- every transcript produced, with its meeting title, date, length and speakers —
-  and **Open** and **Reveal in Explorer** buttons.
+- every transcript produced, with its meeting title, date, length and speakers,
+  a **View** button that shows it in the panel, and **Copy path**.
+
+The canvas deliberately never asks the OS to open a file or a folder. The
+extension host has no desktop session to open a window in, so a button that
+shells out to Explorer does nothing at all — silently, which is worse than an
+error. Reading the file back over the panel's own loopback server always works,
+so that is what View does.
 
 That last part is the reason it exists. The skills previously saved into the
 agent's working directory, which in the app is a per-chat scratch folder under
@@ -116,7 +122,7 @@ extensions/transcript-workbench/         the canvas itself
   workbench-core.mjs                     state, folder browser, HTTP, file open
   assets/workbench.html                  the UI
   scripts/smoke-test.mjs                 exercises the server without the app
-  scripts/open-probe.mjs                 manual: checks Open and Reveal launch
+  scripts/serve-dev.mjs                  serves the panel for clicking through in a browser
 scripts/harvest-transcript.js            DOM harvest, passed to browser_evaluate
 scripts/clean-transcript.py              raw JSON → headed .txt, prints a JSON summary
 ```
@@ -130,9 +136,8 @@ cd extensions/transcript-workbench
 node scripts/smoke-test.mjs
 ```
 
-`scripts/open-probe.mjs` covers the one thing that cannot be automated: it opens
-two real Explorer windows to confirm Open and Reveal report success. Run it by
-hand and close the windows afterwards.
+`scripts/serve-dev.mjs` serves the panel against a temp folder so the UI can be
+clicked through in an ordinary browser, without the app.
 
 `clean-transcript.py` is a normal CLI and can be run by hand:
 

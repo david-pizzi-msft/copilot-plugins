@@ -221,12 +221,12 @@ transcript exist — so rely on the result object, not on an external file.
   to the reader, so do not bury it in a table cell. Give the filename and its
   full folder first.
 
-  If the `transcript-workbench` canvas is available, offer its
-  `reveal_transcript` action — opening Explorer with the file selected answers
-  "where is it?" far better than any link. A markdown `file://` link does not
-  render as clickable in every surface, so treat it as a supplement, never the
-  only signpost. If you do include one, take the `url` from the summary
-  verbatim; it is already percent-encoded, so paths containing spaces survive.
+  If the `transcript-workbench` canvas is available, say the transcript is listed
+  there and can be read with its **View** button. Do not offer to open it in
+  Explorer — the canvas cannot. A markdown `file://` link does not render as
+  clickable in every surface either, so treat it as a supplement, never the only
+  signpost. If you do include one, take the `url` from the summary verbatim; it
+  is already percent-encoded, so paths containing spaces survive.
 - Then report a compact table: path, size, line count, entries harvested, time
   span, and speakers detected. State which path was used when it was
   `"position"`.

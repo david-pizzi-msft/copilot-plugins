@@ -193,6 +193,12 @@ try {
     const goIdle = await (await call("/api/go", { method: "POST" })).json();
     check("go with nothing waiting", !goIdle.ok && goIdle.error === "nothing_waiting", JSON.stringify(goIdle));
 
+    // The canvas cannot hand a file to the OS, so View reads it back over HTTP.
+    const read = await (await call("/api/read?name=Weekly-Sync-20260825-transcript.txt")).json();
+    check("read route returns whole file", read.ok && read.text.includes("Hi, Ada") && read.path.includes("Weekly-Sync"));
+    const readEscape = await (await call("/api/read?name=" + encodeURIComponent("..\\..\\secret.txt"))).json();
+    check("read blocks traversal", !readEscape.ok);
+
     const preview = await (await call("/api/preview?name=Weekly-Sync-20260825-transcript.txt")).json();
     check("preview route", preview.ok && preview.text.includes("Hello, Dave"));
 
@@ -222,9 +228,14 @@ try {
     check("cancel wired", asset.includes('/api/cancel'));
     // Re-rendering on every poll destroyed the buttons mid-click. Both guards
     // must stay: delegation survives a rebuild, the signature avoids one.
-    check("open/reveal delegated", /addEventListener\("click"/.test(asset) && asset.includes('closest("[data-open], [data-reveal]")'));
+    check("actions delegated", /addEventListener\("click"/.test(asset) && asset.includes('closest("[data-view]")'));
     check("transcripts render guarded", asset.includes("renderTranscripts._sig"));
     check("runs render guarded", asset.includes("renderRuns._sig"));
+    // The extension host has no desktop session, so nothing may depend on the
+    // OS opening a window — the panel has to show the file itself.
+    check("viewer present", asset.includes('id="viewerBody"') && asset.includes("/api/read"));
+    check("no OS-open dependency in UI", !asset.includes("/api/open"));
+    check("copy fallback present", asset.includes("execCommand"));
     check("html has folder picker", asset.includes('id="picker"'));
     check("html has token placeholder", asset.includes("__WORKBENCH_TOKEN__"));
 } finally {

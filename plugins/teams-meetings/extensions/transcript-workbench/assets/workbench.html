@@ -101,6 +101,15 @@
   .drives { display: flex; gap: 6px; flex-wrap: wrap; padding: 8px 14px 0; }
   .drives button { padding: 3px 9px; font-size: 12px; border-radius: 5px; background: var(--panel-2); border: 1px solid var(--border); color: var(--text); }
   .primary { background: var(--accent); border: 1px solid var(--accent); color: #fff; padding: 7px 14px; border-radius: 6px; font-size: 12.5px; }
+  /* transcript viewer */
+  #viewerBody {
+    margin: 0; padding: 14px; overflow: auto; flex: 1;
+    font: 12.5px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace;
+    white-space: pre-wrap; word-break: break-word;
+    background: var(--bg); color: var(--text);
+    border-bottom-left-radius: var(--radius); border-bottom-right-radius: var(--radius);
+    user-select: text;
+  }
 </style>
 </head>
 <body>
@@ -143,7 +152,7 @@
   <div class="field">
     <input type="text" id="folder" spellcheck="false" />
     <button class="browse" id="browse">Browse…</button>
-    <button class="browse" id="openFolder">Open</button>
+    <button class="browse" id="openFolder">Copy path</button>
   </div>
 </div>
 
@@ -161,6 +170,20 @@
     <button class="ghost" id="clear">Clear finished</button>
   </div>
   <div id="runs"></div>
+</div>
+
+<div class="modal" id="viewer">
+  <div class="dialog" style="width:min(900px,100%);max-height:86vh">
+    <header>
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <div style="font-weight:600" id="viewerName"></div>
+        <button class="ghost" style="margin-left:auto;padding:4px 10px" id="viewerCopyPath">Copy path</button>
+        <button class="ghost" style="padding:4px 10px" id="viewerClose">Close</button>
+      </div>
+      <div class="cur" id="viewerPath"></div>
+    </header>
+    <pre id="viewerBody"></pre>
+  </div>
 </div>
 
 <div class="modal" id="picker">
@@ -289,25 +312,68 @@ function renderTranscripts(items) {
       <td class="meta">${esc(t.date || "")}</td>
       <td class="meta">${esc(t.duration || "")}</td>
       <td class="actions">
-        <button data-open="${esc(t.name)}">Open</button>
-        <button data-reveal="${esc(t.name)}">Reveal</button>
+        <button data-view="${esc(t.name)}">View</button>
+        <button data-copy="${esc(t.path)}">Copy path</button>
       </td></tr>`).join("") + `</tbody></table>`;
+}
+
+/**
+ * Copy without relying on the async clipboard API, which is frequently blocked
+ * in an embedded frame. The textarea fallback works wherever execCommand does.
+ */
+async function copyText(text) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch { /* fall through */ }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.cssText = "position:fixed;opacity:0";
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
+    ta.remove();
+    return ok;
+  } catch { return false; }
+}
+
+function toast(msg) {
+  const b = $("banner");
+  b.textContent = msg;
+  b.style.borderColor = "var(--ok)";
+  b.style.color = "var(--ok)";
+  b.classList.add("show");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => {
+    b.classList.remove("show");
+    b.style.borderColor = "";
+    b.style.color = "";
+  }, 3000);
+}
+
+async function showTranscript(name) {
+  const data = await api("/api/read?name=" + encodeURIComponent(name));
+  if (!data.ok) { warn("Could not read that transcript: " + (data.error || "unknown")); return; }
+  $("viewerName").textContent = name;
+  $("viewerPath").textContent = data.path;
+  $("viewerBody").textContent = data.text;
+  $("viewerBody").scrollTop = 0;
+  $("viewerCopyPath").dataset.path = data.path;
+  $("viewer").classList.add("show");
 }
 
 // Delegated from the container, which is never replaced. Per spec a click fires
 // on the nearest common ancestor of mousedown and mouseup, so this still works
 // even if the row underneath is rebuilt mid-click.
 $("transcripts").addEventListener("click", async (e) => {
-  const btn = e.target.closest("[data-open], [data-reveal]");
-  if (!btn) return;
-  const reveal = btn.hasAttribute("data-reveal");
-  const name = reveal ? btn.dataset.reveal : btn.dataset.open;
-  btn.disabled = true;
-  try {
-    const r = await api("/api/open", { method: "POST", body: JSON.stringify({ name, reveal }) });
-    if (!r.ok) warn(`Could not ${reveal ? "reveal" : "open"} that file: ` + (r.error || "unknown"));
-  } finally {
-    btn.disabled = false;
+  const view = e.target.closest("[data-view]");
+  if (view) { await showTranscript(view.dataset.view); return; }
+  const copy = e.target.closest("[data-copy]");
+  if (copy) {
+    toast(await copyText(copy.dataset.copy) ? "Path copied to clipboard" : "Could not copy — select it in the viewer instead");
   }
 });
 
@@ -370,8 +436,7 @@ $("cancelGuided").onclick = async () => {
 };
 
 $("openFolder").onclick = async () => {
-  const r = await api("/api/open", { method: "POST", body: JSON.stringify({}) });
-  if (!r.ok) warn("Could not open that folder: " + (r.error || "unknown"));
+  toast(await copyText($("folder").value) ? "Folder path copied to clipboard" : "Could not copy that path");
 };
 $("clear").onclick = async () => { await api("/api/clear", { method: "POST" }); await load(); };
 
@@ -403,6 +468,17 @@ $("pickerChoose").onclick = async () => {
   await load();
 };
 $("picker").onclick = (e) => { if (e.target === $("picker")) $("picker").classList.remove("show"); };
+
+$("viewerClose").onclick = () => $("viewer").classList.remove("show");
+$("viewer").onclick = (e) => { if (e.target === $("viewer")) $("viewer").classList.remove("show"); };
+$("viewerCopyPath").onclick = async (e) => {
+  toast(await copyText(e.target.dataset.path || "") ? "Path copied to clipboard" : "Could not copy that path");
+};
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  $("viewer").classList.remove("show");
+  $("picker").classList.remove("show");
+});
 
 load();
 // Poll steadily: a run's status changes from the session side, not from a click,
