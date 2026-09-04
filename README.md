@@ -10,7 +10,7 @@ installed by name once the marketplace is registered.
 
 | Plugin | What it does |
 |---|---|
-| [`teams-meetings`](plugins/teams-meetings) | Extract full speaker-attributed transcripts from Microsoft Teams meetings — recorded or transcription-only — even when Stream's Download transcript button is disabled by permissions. |
+| [`teams-meetings`](plugins/teams-meetings) | Extract full speaker-attributed transcripts from Microsoft Teams meetings — recorded or transcription-only — even when Stream's Download transcript button is disabled by permissions. Includes a Transcript Workbench canvas for the GitHub Copilot app. |
 
 ## Installing
 
@@ -31,6 +31,25 @@ In **Microsoft Scout**, install with the same `copilot plugin` commands above �
 register the marketplace, install the plugin, and the skills become available
 after a restart.
 
+Note Scout redirects `COPILOT_HOME` to `~/.scout/copilot`, so a `copilot plugin`
+command run from inside Scout installs into Scout's own home and is invisible to
+the GitHub Copilot app, which uses `~/.copilot`. To install for the app, run the
+command from an ordinary terminal instead — and close the app first, since it
+holds a lock on the plugin directory.
+
+## Surfaces
+
+Not every plugin feature works on every surface:
+
+| | Copilot CLI | GitHub Copilot app | Microsoft Scout |
+|---|---|---|---|
+| Skills | yes | yes | yes |
+| MCP servers from `.mcp.json` | yes | yes | provides its own equivalents |
+| Canvas extensions | no | yes | no |
+
+A canvas renders only in the app. The CLI and Scout can run the same skills
+perfectly well from the conversation; they simply cannot draw the UI.
+
 ## Requirements
 
 Individual plugins declare their own requirements — see each plugin's README.
@@ -38,8 +57,13 @@ Broadly:
 
 - **A Playwright MCP browser.** Plugins that automate a browser ship a
   `.mcp.json` declaring [`@playwright/mcp`](https://github.com/microsoft/playwright-mcp),
-  so Copilot CLI acquires the browser tools on install. Scout provides an
-  equivalent browser surface already.
+  so Copilot CLI and the GitHub Copilot app acquire the browser tools on install.
+  Scout provides an equivalent browser surface already.
+
+  Pin a browser channel in that file. Playwright MCP defaults to Google Chrome,
+  which is absent by default on Microsoft-managed machines and usually needs
+  admin approval, so the browser never launches. `--browser msedge` uses the Edge
+  already present on every Windows machine.
 - **Python 3** on `PATH` for plugins with post-processing scripts.
 - **Windows** — the documented shell snippets are PowerShell. The logic is
   portable, but the command examples are not.
@@ -63,8 +87,14 @@ update` needed. Once installed from GitHub, use `copilot plugin update NAME`.
 plugins/<name>/plugin.json        # plugin manifest
 plugins/<name>/.mcp.json          # MCP servers the plugin needs
 plugins/<name>/skills/<skill>/SKILL.md
+plugins/<name>/extensions/<ext>/  # canvas extensions, for the Copilot app
 plugins/<name>/scripts/           # helper scripts shared across the skills
 ```
+
+A plugin's `plugin.json` must declare each of these it uses — `skills`,
+`extensions` and `mcpServers` — or they are simply not loaded. Adding an
+`extensions` key to an already-installed plugin needs the app restarted, since
+extensions are read at start-up.
 
 ## Licence
 

@@ -8,7 +8,7 @@ Works in two situations, with a skill for each, plus a canvas that drives both:
 | Skill | Use when |
 |---|---|
 | `teams-transcript-from-recording` | The meeting was **recorded** and you have a Microsoft Stream / SharePoint URL (`…/_layouts/15/stream.aspx?id=…`). Runs unattended. |
-| `teams-transcript-transcription-only` | The meeting was **transcribed but not recorded**, so no shareable URL exists. Opens a browser, you navigate to Recap → Transcript and say "go", the agent harvests. |
+| `teams-transcript-transcription-only` | The meeting was **transcribed but not recorded**, so no shareable URL exists. Opens a browser, you navigate to Recap → Transcript and say "go" — or press **Go** in the canvas — and the agent harvests. |
 | `transcript-workbench` | You would rather click than type. Opens a dashboard in the GitHub Copilot app. |
 
 Each extraction skill points at the other, so the agent can hand off if it picks
@@ -24,24 +24,20 @@ with a card per extraction mode, each self-contained:
   guided capture has to pause while you sign in and reach Recap → Transcript;
   pressing Go resumes the agent without typing into the conversation, so the run
   stays in one place. A paused run shows as *waiting*, not failed.
-- a shared **folder picker** for where transcripts are saved, remembered between runs;
+- a shared **folder picker** for where transcripts are saved, remembered between
+  runs and defaulting to `~/Documents/Teams Transcripts` (override with
+  `TEAMS_TRANSCRIPT_DIR`);
 - every transcript produced, with its meeting title, date, length and speakers,
-  and an **Open** button that opens it in your default editor. The destination
-  folder has its own **Open folder** button.
+  and an **Open** button that launches it. The destination folder has its own
+  **Open folder** button.
 
-One detail makes those buttons work from inside the extension host, taken from
-the vbd-content-agent panel: `execFile` must **not** be given `windowsHide`,
-since that sets `CREATE_NO_WINDOW` and explorer.exe inherits it, so the window
-silently never appears. The callback is also treated as success regardless,
-because explorer.exe exits non-zero even when it worked.
-
-That last part is the reason it exists. The skills previously saved into the
-agent's working directory, which in the app is a per-chat scratch folder under
-`~/.copilot/chats/<date>/<slug>` — correct, but effectively undiscoverable, and
-discarded along with the chat. Reporting a `file://` link did not reliably help,
-because such links do not render as clickable in every surface. Making the
-destination an explicit input, and going through the OS to open it, fixes the
-cause instead of the symptom.
+That last part is the reason the canvas exists. The skills previously saved into
+the agent's working directory, which in the app is a per-chat scratch folder
+under `~/.copilot/chats/<date>/<slug>` — correct, but effectively
+undiscoverable, and discarded along with the chat. Reporting a `file://` link did
+not reliably help either, because such links do not render as clickable in every
+surface. Making the destination an explicit input, and going through the OS to
+open it, fixes the cause instead of the symptom.
 
 The canvas renders only in the GitHub Copilot app. Copilot CLI and Microsoft
 Scout can run the skills perfectly well, but cannot draw the UI.
@@ -103,12 +99,19 @@ Owner: Jane Doe
 Transcript extracted 27 August 2026 | AI-generated content may be incorrect
 ==============================================================================
 
+Jane Doe started transcription
+
 [0:50] Ada Lovelace:
 Hello, Dave.
 
 [0:53] Dave Pizzi:
 Hi, Ada.
 ```
+
+The `Source | date | start | duration` line reflects where it came from —
+`Microsoft Teams Recap` or `Microsoft Stream (SharePoint)`. Duration is taken
+from the last transcript timestamp, not the scheduled slot, because meetings
+routinely overrun.
 
 ## Contents
 
@@ -119,6 +122,7 @@ skills/teams-transcript-from-recording/
 skills/teams-transcript-transcription-only/
 skills/transcript-workbench/             opens the canvas
 extensions/transcript-workbench/         the canvas itself
+  package.json                           declares the Copilot SDK dependency
   extension.mjs                          canvas lifecycle, dispatches runs
   workbench-core.mjs                     state, folder browser, HTTP, file open
   assets/workbench.html                  the UI
@@ -150,8 +154,32 @@ python scripts/clean-transcript.py transcript-raw.md `
 
 It prints a JSON summary to stdout, including the resolved absolute `path`, the
 containing `folder`, and `url` / `folder_url` as percent-encoded `file://` URIs.
-The skills use those to end the run with a clickable link, so you are never left
-hunting for where the transcript was saved.
+The skills report the path from that summary, so you are never left hunting for
+where the transcript was saved.
+
+## Notes for anyone changing this
+
+Four things cost real time to discover and are easy to undo by accident.
+
+- **Don't drop `--browser msedge` from `.mcp.json`.** See Requirements above —
+  the plugin cannot launch a browser at all without it on a managed machine.
+- **Don't pass `windowsHide` to `execFile` in the canvas launcher.** It sets
+  `CREATE_NO_WINDOW`, which `explorer.exe` inherits, so the window silently never
+  appears — the call reports success and nothing happens. Ignore the callback
+  error too: `explorer.exe` exits non-zero even when it worked. `smoke-test.mjs`
+  asserts the flag stays absent.
+- **Don't judge a run by `session.idle`.** The agent idles mid-job — waiting for
+  the user in the guided flow, and at other times besides. A run was once marked
+  failed two minutes before its transcript appeared. The canvas polls the output
+  folder instead and settles a run when the file lands.
+- **Don't re-render a table on a timer without a guard.** A click needs mousedown
+  and mouseup on the same element, so rebuilding rows every couple of seconds
+  makes buttons silently stop working. Handlers are delegated from a container
+  that is never replaced, and both tables only touch the DOM when a content
+  signature changes.
+
+The panel's script is inline with no build step, so `smoke-test.mjs` parses it —
+a stray brace disables every button and looks exactly like a dead server.
 
 ## Known limitations
 
@@ -166,5 +194,9 @@ hunting for where the transcript was saved.
   the scroll container rather than hard-coding selectors, but a sufficiently
   large redesign will still break it. Both skills include a probe step to catch
   this before harvesting.
+- **A stalled guided capture shows as *waiting*, not failed.** From inside the
+  canvas a pause and a stall look identical, so it waits for you to press Go or
+  Cancel rather than guessing. Claiming failure while a run is still working is
+  the worse error.
 - Meeting content may be confidential. The transcript is written to local disk
   at your request; the skills are instructed never to forward or upload it.
